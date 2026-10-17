@@ -437,6 +437,73 @@ def grid_geometry(R, d, n_great_circles):
     return dict(length=L, area=A, volume=V, transparency=T)
 
 
+def load_grid_kicks(path=None):
+    """Azimuthal grid-kick table written by fusorsim.physics.grid3d: quantiles of the change of
+    l_z = x v_y - y v_x (m^2/s) between successive cathode crossings of ions in the 3D field of the real
+    great-circle grids, per (inward?, |cos polar|, energy) cell. 2D-RZ has no such torque (its rings are
+    axisymmetric), which is why every RZ ion passes through the axis."""
+    import hashlib
+    import json
+    path = path or os.path.join(DATA_DIR, "grid_kicks_3d.dat")
+    geom, probs, rows = None, None, []
+    with open(path) as f:
+        for ln in f:
+            if ln.startswith("# geometry:"):
+                geom = json.loads(ln.split(":", 1)[1])
+            elif ln.startswith("# quantiles:"):
+                probs = np.array(ln.split(":", 1)[1].split(), float)
+            elif ln.strip() and not ln.startswith("#"):
+                rows.append([float(v) for v in ln.split()])
+    if geom is None or probs is None or not rows:
+        raise ValueError(f"{path}: not a grid-kick table")
+    R = np.array(rows)
+    with open(path, "rb") as f:
+        sha = hashlib.sha256(f.read()).hexdigest()
+    return dict(path=os.path.abspath(path), sha256=sha, geometry=geom, probs=probs, inward=R[:, 0].astype(bool),
+                cos_lo=R[:, 1], cos_hi=R[:, 2], E_lo=R[:, 3], E_hi=R[:, 4], n=R[:, 5].astype(int), q=R[:, 7:])
+
+
+def check_grid_kicks_geometry(table, **geom):
+    """Raise ValueError unless the table was made for this geometry (R_c, d_c, R_a, d_a, great_circles,
+    V_c, R_ch, H_ch): kicks from another grid would be silently wrong."""
+    bad = [f"{k}: table {table['geometry'].get(k)} vs run {v}" for k, v in geom.items()
+           if table["geometry"].get(k) is None or not np.isclose(float(table["geometry"][k]), float(v), rtol=1e-6)]
+    if bad:
+        raise ValueError(f"grid-kick table {table['path']} was made for another geometry: " + "; ".join(bad)
+                         + "  (re-run: python -m fusorsim.physics.grid3d --case <case>)")
+
+
+def sample_grid_kick(table, inward, cos_abs, E_eV, rng):
+    """Change of l_z (m^2/s) for each crossing, by inverse-CDF interpolation in its table cell. Energies
+    outside the tabulated range use the nearest cell."""
+    inward = np.asarray(inward, bool); cos_abs = np.clip(np.asarray(cos_abs, float), 0.0, 1.0)
+    E_eV = np.clip(np.asarray(E_eV, float), table["E_lo"].min(), np.nextafter(table["E_hi"].max(), 0))
+    out = np.zeros(inward.shape)
+    if not out.size:
+        return out
+    nq = table["q"].shape[1]
+    u = rng.random(out.size) * (nq - 1)
+    k = np.minimum(u.astype(int), nq - 2); f = u - k
+    for c in range(len(table["n"])):
+        m = ((inward == table["inward"][c]) & (cos_abs >= table["cos_lo"][c]) & (cos_abs <= table["cos_hi"][c])
+             & (E_eV >= table["E_lo"][c]) & (E_eV < table["E_hi"][c]))
+        if np.any(m):
+            q = table["q"][c]
+            out[m] = q[k[m]] * (1 - f[m]) + q[k[m] + 1] * f[m]
+    return out
+
+
+def apply_azimuthal_kick(ux, uy, uz, theta, r, dlz, max_frac=0.5):
+    """Add dlz/r to the azimuthal velocity (e_phi = (-sin th, cos th, 0)) and rescale to the old speed, so
+    the kick only turns the velocity (no energy change). |dlz/r| is capped at max_frac*|v| for crossings
+    very near the axis (r -> 0), where the 3D torque is small anyway. Returns new (ux, uy, uz)."""
+    v = np.sqrt(ux * ux + uy * uy + uz * uz)
+    dv = np.clip(dlz / np.maximum(r, 1e-6), -max_frac * v, max_frac * v)
+    nx, ny, nz = ux - dv * np.sin(theta), uy + dv * np.cos(theta), uz
+    s = v / np.maximum(np.sqrt(nx * nx + ny * ny + nz * nz), 1e-30)
+    return nx * s, ny * s, nz * s
+
+
 def lumped_wire_transient(P_W, material, area, mass, t_end=15.0, T0=300.0,
                           T_env=300.0, eps_const=None, dt=1e-3):
     """Lumped (isothermal) radiative transient of a wire grid:

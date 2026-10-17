@@ -25,6 +25,11 @@ Monash M3 (production, Slurm + MPI). The layout is in [README.md](README.md); th
   reflection on, `--makeup anode`. Don't change a default silently. Record the reason in the commit and in docs.
 - When a modelling choice is uncertain, pick the conservative option (more neutrons, more heating) and say so in a comment.
 - Every model or constant from the literature cites its source in [docs/references.md](docs/references.md).
+- 2D-RZ has no torque about z, so without help every ion crosses the axis (the RZ axis line). `--grid-kicks on`
+  adds the l_z change the real 3D wire grid gives at each cathode crossing, sampled from
+  `data/grid_kicks_3d.dat` (made by `python -m fusorsim.physics.grid3d --case <case>`). The table is
+  geometry-specific: regenerate it after changing radii, wires, `--great-circles`, voltage or chamber size
+  (the driver refuses a mismatch).
 - Keep the verified conventions:
   - WarpX implicit function: >0 inside solid, <0 in vacuum. The inverted sign fills the cathode.
   - `--nr` must be a multiple of 8 (AMReX blocking factor).

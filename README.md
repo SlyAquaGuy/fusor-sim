@@ -72,5 +72,8 @@ Verified: package imports, physics self-test, preflight via `--case`, unit tests
 `analysis` and `viz` images built in WSL (2026-10-17); serial `coarse_test` run in the warpx image (1 rank x 16
 threads, 263 s), post-processed in the analysis image, rendered (incl. `--movie`) in the viz image.
 MPI in WSL: `coarse_test` with 2, 4 and 8 ranks agrees with 1 rank within Monte Carlo noise.
+3D grid kicks (`--grid-kicks`, branch `grid-kicks`): field model and tracer verified (wire potentials within
+~3 %, no torque from an axisymmetric grid); **not yet calibrated** (`data/grid_kicks_3d.dat` to be generated)
+or run in WarpX, so the default stays `off`.
 **Not yet verified:** `openmc`, `ansys` image builds, multi-node MPI, M3 launch.
 See [docs/mpi.md](docs/mpi.md#status).

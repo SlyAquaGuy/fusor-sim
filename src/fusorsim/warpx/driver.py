@@ -99,6 +99,10 @@ g.add_argument("--RN-W", type=float, default=fp.REFLECTION_DEFAULTS["W"][0])
 g.add_argument("--RE-W", type=float, default=fp.REFLECTION_DEFAULTS["W"][1])
 g.add_argument("--RN-Fe", type=float, default=fp.REFLECTION_DEFAULTS["Fe"][0])
 g.add_argument("--RE-Fe", type=float, default=fp.REFLECTION_DEFAULTS["Fe"][1])
+g.add_argument("--grid-kicks", choices=["off", "on"], default="off",
+               help="azimuthal kicks at cathode crossings from the 3D wire grid (fixes the RZ axis line; "
+                    "table from fusorsim.physics.grid3d)")
+g.add_argument("--grid-kicks-table", default=None, help="grid-kick table (default: data/grid_kicks_3d.dat)")
 g.add_argument("--makeup", choices=["shape", "anode"], default="anode",
                help="where controller makeup ions are born: 'shape' = same distribution as modelled births; "
                     "'anode' = at rest just inside the anode (falls through full V: neutron upper bound)")
@@ -312,9 +316,28 @@ for name, op, d in (("cathode", op_c, args.cathode_wire), ("anode", op_a, args.a
 p_cx_max = 1 - np.exp(-n_gas * fp.sigma_cx(np.array([5e3]))[0] * fp.speed_from_energy(5e3 * fp.e, fp.m_d) * dt_cb)
 print(f"  max CX probability per callback interval: {p_cx_max:.3f} (must be << 1)")
 assert p_cx_max < 0.1, "reduce --ncb"
+# 3D grid kicks: RZ rings exert no torque about z, so without them every ion keeps l_z ~ 0 and crosses
+# the axis (the RZ axis line). The table holds the l_z change the real wires give per cathode crossing.
+KICKS = None
+if args.grid_kicks == "on":
+    try:
+        KICKS = fp.load_grid_kicks(args.grid_kicks_table)
+    except FileNotFoundError as ex:
+        sys.exit(f"--grid-kicks on: no table ({ex.filename}). Make it with: "
+                 "python -m fusorsim.physics.grid3d --case <case>")
+    try:
+        fp.check_grid_kicks_geometry(KICKS, R_c=R_c, d_c=args.cathode_wire, R_a=R_a, d_a=args.anode_wire,
+                                     great_circles=args.great_circles, V_c=V_c, R_ch=R_ch, H_ch=H_ch)
+    except ValueError as ex:
+        sys.exit(str(ex))
+    print(f"  grid kicks ON: {KICKS['path']} ({int(KICKS['n'].sum())} 3D crossings, sha256 {KICKS['sha256'][:12]})")
+else:
+    print("  grid kicks OFF: pure RZ (every ion crosses the axis)")
+params.update(grid_kicks=args.grid_kicks, grid_kicks_table=KICKS["path"] if KICKS else None,
+              grid_kicks_sha256=KICKS["sha256"] if KICKS else None)
 print("=" * 78)
 
-trk_t0 = args.track_start if args.track_start is not None else max(args.t_avg, args.t_end - args.track_len)
+trk_t0 =args.track_start if args.track_start is not None else max(args.t_avg, args.t_end - args.track_len)
 params.update(track_n=args.track_n, track_t0=trk_t0, track_t1=trk_t0 + args.track_len)
 params.update(nranks=SIZE, omp_threads=os.environ.get("OMP_NUM_THREADS"),
               fusorsim_git=os.environ.get("FUSORSIM_GIT"), sif_digest=os.environ.get("FUSORSIM_SIF_SHA256"))
@@ -893,7 +916,7 @@ def physics_callback():
         "strip", "G_ion_cathode", "G_ion_anode", "G_ion_wall", "P_ion_cathode", "P_ion_anode", "P_ion_wall",
         "G_neu_cathode", "G_neu_anode", "G_neu_wall", "P_neu_cathode", "P_neu_anode", "P_neu_wall",
         "G_see_ion", "G_see_neu", "Pe_anode", "Pe_wall", "Pe_gasborn", "N_real", "E_ion_sum", "G_int_cathode",
-        "birth_outer")}
+        "birth_outer", "grid_kick", "grid_kick_absdlz")}
     n_macro = 0
     vmax_seen = 0.0
 
@@ -971,6 +994,18 @@ def physics_callback():
         r, z = a["r"], a["z"]
         if tracking:                                 # before CX below changes velocities
             trk.record(t, a["idcpu"], r * np.cos(a["theta"]), r * np.sin(a["theta"]), z, E)
+        if KICKS is not None:
+            # cathode crossings since the last callback: straight-line backtrack over Dt (<= ~3.6 mm of
+            # path at 60 keV with --ncb 10), then a sign change of |X| - R_c
+            th_, ux, uy, uz = a["theta"], a["ux"], a["uy"], a["uz"]
+            rs_now = np.sqrt(r * r + z * z)
+            rs_prev = np.sqrt((r * np.cos(th_) - ux * Dt) ** 2 + (r * np.sin(th_) - uy * Dt) ** 2 + (z - uz * Dt) ** 2)
+            kx = (rs_prev - R_c) * (rs_now - R_c) < 0
+            if np.any(kx):
+                dl = fp.sample_grid_kick(KICKS, rs_now[kx] < rs_prev[kx], np.abs(z[kx]) / rs_now[kx], E[kx], rng)
+                ux[kx], uy[kx], uz[kx] = fp.apply_azimuthal_kick(ux[kx], uy[kx], uz[kx], th_[kx], r[kx], dl)
+                acc["grid_kick"] += w[kx].sum()
+                acc["grid_kick_absdlz"] += np.sum(w[kx] * np.abs(dl))
         if in_window:
             H["fus_ion_rz"] += np.histogram2d(r, z, [r_edges, z_edges], weights=Rn)[0]
             H["fus_ion_E"] += np.histogram(E, E_edges, weights=Rn)[0]
@@ -1115,7 +1150,11 @@ def physics_callback():
                injected_real_rate=injected_real / Dt, phys_birth_rate=phys_real / Dt,
                vmax_cfl=vmax_seen * dt / min(dx, dz))
     for k, v in acc.items():
-        if k in ("N_real", "E_ion_sum"):
+        if k in ("N_real", "E_ion_sum", "grid_kick_absdlz"):
+            continue
+        if k == "grid_kick":                               # crossings kicked per second, mean |dl_z| (m^2/s)
+            row["grid_kick_rate"] = v / Dt
+            row["grid_kick_mean_dlz"] = acc["grid_kick_absdlz"] / max(v, 1e-30)
             continue
         if k.startswith("fus") or k.startswith("G_") or k in ("cx", "birth_ion", "birth_neu", "birth_e", "strip", "birth_outer"):
             row[k + "_rate"] = v / Dt                      # per second
