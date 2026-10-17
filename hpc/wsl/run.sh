@@ -3,11 +3,12 @@
 # command returns. Watch it with fusor-monitor (http://localhost:8050) or `tail -f runs/<name>.log`.
 #   hpc/wsl/run.sh R1_bound_5mT                        # default: 1 rank x half the logical CPUs
 #   RANKS=2 THREADS=4 hpc/wsl/run.sh R1_bound_5mT --nr 400   # extra args go to fusor-warpx (CLI wins over case)
-#   FOREGROUND=1 NAME=bench_4x2 hpc/wsl/run.sh coarse_test   # block until done (benchmarks, scripts)
+#   FOREGROUND=1 RUN_NAME=bench_4x2 hpc/wsl/run.sh coarse_test   # block until done (benchmarks, scripts)
 #   LIVE_SRC=1 hpc/wsl/run.sh coarse_test                  # use ./src instead of the image's copy (dev only:
 #                                                          # provenance then is the checkout, rebuild for real runs)
-# Output: runs/<NAME>/ plus runs/<NAME>.log and runs/<NAME>.pid (default NAME = <case>_<YYYYmmdd_HHMMSS>).
-# Stop:   kill -TERM -"$(cat runs/<NAME>.pid)"           # the whole process group (mpirun + ranks)
+# Output: runs/<RUN_NAME>/ plus runs/<RUN_NAME>.log and runs/<RUN_NAME>.pid (default RUN_NAME = <case>_<YYYYmmdd_HHMMSS>).
+# (Not NAME: WSL exports NAME=<hostname>, which silently named every run after the PC.)
+# Stop:   kill -TERM -"$(cat runs/<RUN_NAME>.pid)"           # the whole process group (mpirun + ranks)
 # Ranks x threads: MPI ranks split the mesh AND the Python physics callback (serial within a rank), so
 # more ranks usually beat more threads; the mesh has ~28 boxes at --max-grid-size 64 (docs/mpi.md).
 # The best split is machine-specific: time it with a cases/bench_<machine>.yaml case and set RANKS/THREADS.
@@ -19,9 +20,9 @@ RANKS="${RANKS:-1}"
 THREADS="${THREADS:-$(( $(nproc) / 2 > 0 ? $(nproc) / 2 : 1 ))}"
 SIF=sif/warpx.sif
 [ -e "$SIF" ] || { echo "no $SIF: run containers/build.sh warpx" >&2; exit 1; }
-NAME="${NAME:-${CASE}_$(date +%Y%m%d_%H%M%S)}"
-OUT="runs/$NAME" LOG="runs/$NAME.log"
-[ -e "$OUT/timeseries.csv" ] && { echo "$OUT already holds a run: pick another NAME" >&2; exit 1; }
+RUN_NAME="${RUN_NAME:-${CASE}_$(date +%Y%m%d_%H%M%S)}"
+OUT="runs/$RUN_NAME" LOG="runs/$RUN_NAME.log"
+[ -e "$OUT/timeseries.csv" ] && { echo "$OUT already holds a run: pick another RUN_NAME" >&2; exit 1; }
 mkdir -p runs
 
 export APPTAINERENV_FUSORSIM_SIF_SHA256="$(cut -d' ' -f1 "$(readlink -f "$SIF").sha256")"
@@ -41,11 +42,11 @@ else
   cmd=(apptainer exec "${bind[@]}" "$SIF" fusor-warpx)
 fi
 cmd+=(--case "cases/$CASE.yaml" --outdir "$OUT" "$@")
-echo "$NAME: $RANKS rank(s) x $THREADS thread(s) -> $OUT  (log $LOG)"
+echo "$RUN_NAME: $RANKS rank(s) x $THREADS thread(s) -> $OUT  (log $LOG)"
 if [ -n "${FOREGROUND:-}" ]; then
   "${cmd[@]}" > "$LOG" 2>&1
 else
   setsid nohup "${cmd[@]}" > "$LOG" 2>&1 < /dev/null &
-  echo $! > "runs/$NAME.pid"
-  echo "started, pid $(cat "runs/$NAME.pid").  Monitor: fusor-monitor --runs runs  ->  http://localhost:8050"
+  echo $! > "runs/$RUN_NAME.pid"
+  echo "started, pid $(cat "runs/$RUN_NAME.pid").  Monitor: fusor-monitor --runs runs  ->  http://localhost:8050"
 fi

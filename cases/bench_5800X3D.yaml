@@ -1,6 +1,6 @@
 # Layout benchmark for ONE machine: AMD Ryzen 7 5800X3D (8 cores / 16 threads), WSL2 Ubuntu 24.04, 28 GB.
 # Same physics as coarse_test (0.2 us, 1333 steps); run it once per layout with 8 workers (= half this PC):
-#   for L in 1x8 2x4 4x2 8x1; do RANKS=${L%x*} THREADS=${L#*x} FOREGROUND=1 NAME=bench_$L hpc/wsl/run.sh bench_5800X3D; done
+#   for L in 1x8 2x4 4x2 8x1; do RANKS=${L%x*} THREADS=${L#*x} FOREGROUND=1 RUN_NAME=bench_$L hpc/wsl/run.sh bench_5800X3D; done
 # Measured 2026-10-17 (warpx image, git 9fabf4c + MPI injection fix), wall time incl. start-up:
 #   ranks x threads   wall    mean MLMG bottom solve
 #   2 x 4             175 s   0.107 s/step   <- use this here: RANKS=2 THREADS=4
