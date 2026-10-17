@@ -45,7 +45,12 @@ Monash M3 (production, Slurm + MPI). The layout is in [README.md](README.md); th
 - Monte Carlo is rank-local, with one RNG stream per rank: `SeedSequence(seed).spawn(size)[rank]`.
 - Global quantities (interval sums, macro counts, max velocity) are `Allreduce`d before the controller,
   so `alpha` comes out identical on all ranks.
-- Only rank 0 writes shared files. pywarpx field access is collective, so all ranks must call it.
+- Only rank 0 writes shared files.
+- Collective pywarpx calls must happen the **same number of times on every rank**, never behind a rank-local
+  condition: `add_particles` (ends in `Redistribute`; use `inject` + `flush_injections`), field access
+  (`PhiFPWrapper(0)[...]`), `get_particle_count()` / `get_particle_boundary_buffer_size()` (default `local=False`).
+  Breaking this deadlocks only with ≥2 ranks, so test MPI changes with `RANKS=2 hpc/wsl/run.sh coarse_test`.
+- When ranks share a machine, bind each to its own cores (the image sets `OMP_PROC_BIND=spread`).
 - Restart needs the same rank count. Results are reproducible for a fixed (seed, ranks) pair, not across rank counts.
 
 ## Rules: runs and provenance
@@ -83,9 +88,9 @@ fusor-warpx --case cases/coarse_test.yaml --preflight --outdir runs/pf
 containers/build.sh warpx            # builds mpi-base first if missing
 containers/build.sh analysis
 
-# runs
-OMP_NUM_THREADS=8 apptainer run sif/warpx.sif --case cases/coarse_test.yaml --outdir runs/coarse_test
-apptainer run sif/analysis.sif runs/coarse_test                   # -> runs/coarse_test/post/report.md
+# runs (WSL): detached, ranks bound to their own cores; layout per machine from cases/bench_<machine>.yaml
+RANKS=2 THREADS=4 hpc/wsl/run.sh R1_bound_5mT                      # -> runs/<case>_<time>/ (+ .log, .pid)
 fusor-monitor --runs runs                                          # live progress page, http://localhost:8050
-apptainer exec sif/warpx.sif mpirun -n 2 fusor-warpx --case cases/coarse_test.yaml --outdir runs/ct_np2
+apptainer run sif/analysis.sif runs/<run>                          # -> runs/<run>/post/report.md
+LIVE_SRC=1 RANKS=2 THREADS=4 hpc/wsl/run.sh coarse_test            # test ./src changes without a rebuild
 ```

@@ -37,14 +37,15 @@ Build and use the images (Ubuntu: `sudo add-apt-repository -y ppa:apptainer/ppa 
 ```bash
 containers/build.sh warpx                      # -> sif/warpx-<ver>.sif (+ mpi-base)
 containers/build.sh analysis
-apptainer exec --bind $PWD/src:/opt/fusor-sim/src sif/warpx.sif \
-    python3 -c "import fusorsim"               # live-edit code against frozen dependencies
-OMP_NUM_THREADS=8 apptainer run sif/warpx.sif --case cases/coarse_test.yaml --outdir runs/coarse_test
-apptainer run sif/analysis.sif runs/coarse_test                            # -> post/report.md
+RANKS=2 THREADS=4 hpc/wsl/run.sh R1_bound_5mT  # detached; -> runs/R1_bound_5mT_<time>/ + .log + .pid
 fusor-monitor --runs runs                      # live progress page: http://localhost:8050 (stdlib only)
-# WSL has no host MPI: use the image's mpirun (on M3 the host srun launches the image instead)
-apptainer exec sif/warpx.sif mpirun -n 2 fusor-warpx --case cases/coarse_test.yaml --outdir runs/t2
+apptainer run sif/analysis.sif runs/<run>     # -> runs/<run>/post/report.md
+LIVE_SRC=1 hpc/wsl/run.sh coarse_test          # dev: run ./src against the image's frozen dependencies
 ```
+
+`hpc/wsl/run.sh` runs MPI inside the image (WSL has no host MPI; on M3 the host `srun` launches the image) and
+gives each rank its own cores. The best ranks x threads split is machine-specific: time it with a
+`cases/bench_<machine>.yaml` case (see `cases/bench_5800X3D.yaml`).
 
 ## Deploy (M3)
 
@@ -69,5 +70,6 @@ seed and all derived inputs. Results are reproducible for a fixed (seed, number 
 Verified: package imports, physics self-test, preflight via `--case`, unit tests; `mpi-base`, `warpx` and
 `analysis` images built in WSL (2026-10-17); serial `coarse_test` run in the warpx image (1 rank x 16 threads,
 263 s) and post-processed in the analysis image.
-**Not yet verified:** `openmc`, `viz`, `ansys` image builds, MPI runs (the driver's MPI path has only been
-exercised with one rank), M3 launch. See [docs/mpi.md](docs/mpi.md#status).
+MPI in WSL: `coarse_test` with 2, 4 and 8 ranks agrees with 1 rank within Monte Carlo noise.
+**Not yet verified:** `openmc`, `viz`, `ansys` image builds, multi-node MPI, M3 launch.
+See [docs/mpi.md](docs/mpi.md#status).

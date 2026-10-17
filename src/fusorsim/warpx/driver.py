@@ -681,13 +681,32 @@ def electron_births_from_cathode(Xc, we, acc):
     acc["birth_e"] += idx.size * w_ref
 
 
+PENDING_INJ = []
+
+
 def inject(X, U, W):
-    if len(W) == 0:
-        return 0
+    """Queue ions for this callback's single add_particles call (flush_injections)."""
+    if len(W):
+        PENDING_INJ.append((X, U, W))
+    return len(W)
+
+
+def flush_injections():
+    """Exactly ONE add_particles per callback on EVERY rank, even with nothing to add: WarpX's
+    AddNParticles ends in a collective Redistribute, so a rank that skips the call (no births in its
+    boxes this interval) or makes a different number of calls deadlocks the others (seen with 2 ranks)."""
+    if PENDING_INJ:
+        X = np.vstack([p[0] for p in PENDING_INJ])
+        U = np.vstack([p[1] for p in PENDING_INJ])
+        W = np.concatenate([p[2] for p in PENDING_INJ])
+        PENDING_INJ.clear()
+    elif SIZE == 1:
+        return
+    else:
+        X = U = np.zeros((0, 3)); W = np.zeros(0)
     sim.particles.get("ions").add_particles(
         x=X[:, 0].copy(), y=X[:, 1].copy(), z=X[:, 2].copy(),
         ux=U[:, 0].copy(), uy=U[:, 1].copy(), uz=U[:, 2].copy(), w=W.copy(), unique_particles=True)
-    return len(W)
 
 
 # --- vacuum potential map (read from WarpX's first solve, before any charge) ---
@@ -1012,6 +1031,7 @@ def physics_callback():
     for X, U, W in fast_ions:
         ok = valid_birth_positions(X)
         n_inj += inject(X[ok], U[ok], W[ok])
+    flush_injections()   # collective: every rank, every callback
 
     # ---- 4b. MPI: one global picture of this interval. Everything below (controller,
     #      timeseries) is computed from identical reduced numbers on every rank, so

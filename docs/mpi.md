@@ -43,7 +43,15 @@ The image uses OpenMPI's *internal* PMIx; if the host `srun` speaks a different 
 * Done and verified: serial path through the package; `--case`; unit tests; `mpi-base` (OpenMPI 4.1.6),
   `warpx` and `analysis` images built in WSL; serial `coarse_test` run in the warpx image.
 * Written, **not built or run**: `openmc`, `viz`, `ansys` `.def` files; Slurm scripts.
-* MPI code paths (`SIZE > 1`) are untested. Known things to check when first run under `mpirun -n 2`:
+* MPI in WSL (2026-10-17, `hpc/wsl/run.sh`, 2/4/8 ranks on `coarse_test`): one `timeseries.csv` header,
+  monotonic steps, end state (n_macro, current, neutron rates) equal to the 1-rank run within Monte Carlo noise.
+  Two bugs found on the way, both fixed:
+  1. **deadlock**: `add_particles` ends in a collective `Redistribute`, but the driver skipped it on ranks with
+     no births and called it once per (rank-local) fast-ion batch. Now one call per callback on every rank
+     (`flush_injections`).
+  2. **75x slower Poisson solve**: unbound ranks each applied the image's `OMP_PROC_BIND=spread` over the same
+     CPUs. Ranks are now bound to disjoint cores (`--map-by slot:PE=<threads> --bind-to core`).
+* Still to check on M3 / multi-node (items from the first MPI plan, 1 and 4 not yet tested directly):
   1. pywarpx field access (`PhiFPWrapper(0)[...]`) returns the **global** array on every rank (else the vacuum map is wrong);
   2. `add_particles(..., unique_particles=True)` really keeps each rank's particles (particle count conserved);
   3. exactly one `timeseries.csv` header and monotonic `step` column;

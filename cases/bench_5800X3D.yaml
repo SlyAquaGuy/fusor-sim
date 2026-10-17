@@ -1,0 +1,17 @@
+# Layout benchmark for ONE machine: AMD Ryzen 7 5800X3D (8 cores / 16 threads), WSL2 Ubuntu 24.04, 28 GB.
+# Same physics as coarse_test (0.2 us, 1333 steps); run it once per layout with 8 workers (= half this PC):
+#   for L in 1x8 2x4 4x2 8x1; do RANKS=${L%x*} THREADS=${L#*x} FOREGROUND=1 NAME=bench_$L hpc/wsl/run.sh bench_5800X3D; done
+# Measured 2026-10-17 (warpx image, git 9fabf4c + MPI injection fix), wall time incl. start-up:
+#   ranks x threads   wall    mean MLMG bottom solve
+#   2 x 4             175 s   0.107 s/step   <- use this here: RANKS=2 THREADS=4
+#   4 x 2             184 s   0.113 s/step
+#   8 x 1             197 s   0.116 s/step
+#   1 x 8             198 s   0.119 s/step
+# The Poisson bottom solve (~85 % of a step, 1 MG level) barely scales with ranks, so layouts differ by
+# only ~12 %. End states agree across layouts within Monte Carlo noise (n_macro 3.82e5, I 47 mA).
+# Re-run after changing the solver, mesh, --max-grid-size or the image.
+name: bench_5800X3D
+description: rank x thread layout benchmark for the 5800X3D workstation (coarse_test physics)
+chamber_half_length: 0.144
+t_end: 0.2e-6
+t_avg: 0.1e-6
