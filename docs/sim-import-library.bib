@@ -1,0 +1,651 @@
+% fusor-sim reference library -- import into Zotero with File > Import...
+% Every reference cited in the code (src/), data/, docs/ and CITATION.cff, plus the software the
+% images are built from. DOIs and bibliographic details checked against Crossref / arXiv on 2026-10-17
+% unless the `note` field says otherwise. Long author lists are truncated with "and others".
+% Grouped with the `keywords` field: practice, software, data, physics-atomic, physics-fusion,
+% physics-surface, physics-stopping, physics-thermal, physics-xray, dose, materials.
+
+% =====================================================================================
+% Scientific-computing practice (docs/references.md)
+% =====================================================================================
+
+@article{wilson2014best,
+  author   = {Wilson, Greg and Aruliah, D. A. and Brown, C. Titus and Chue Hong, Neil P. and Davis, Matt and Guy, Richard T. and Haddock, Steven H. D. and Huff, Kathryn D. and others},
+  title    = {Best Practices for Scientific Computing},
+  journal  = {PLoS Biology},
+  volume   = {12},
+  number   = {1},
+  pages    = {e1001745},
+  year     = {2014},
+  doi      = {10.1371/journal.pbio.1001745},
+  keywords = {practice}
+}
+
+@article{wilson2017good,
+  author   = {Wilson, Greg and Bryan, Jennifer and Cranston, Karen and Kitzes, Justin and Nederbragt, Lex and Teal, Tracy K.},
+  title    = {Good enough practices in scientific computing},
+  journal  = {PLOS Computational Biology},
+  volume   = {13},
+  number   = {6},
+  pages    = {e1005510},
+  year     = {2017},
+  doi      = {10.1371/journal.pcbi.1005510},
+  keywords = {practice}
+}
+
+@article{noble2009quick,
+  author   = {Noble, William Stafford},
+  title    = {A Quick Guide to Organizing Computational Biology Projects},
+  journal  = {PLoS Computational Biology},
+  volume   = {5},
+  number   = {7},
+  pages    = {e1000424},
+  year     = {2009},
+  doi      = {10.1371/journal.pcbi.1000424},
+  keywords = {practice}
+}
+
+@article{sandve2013ten,
+  author   = {Sandve, Geir Kjetil and Nekrutenko, Anton and Taylor, James and Hovig, Eivind},
+  title    = {Ten Simple Rules for Reproducible Computational Research},
+  journal  = {PLoS Computational Biology},
+  volume   = {9},
+  number   = {10},
+  pages    = {e1003285},
+  year     = {2013},
+  doi      = {10.1371/journal.pcbi.1003285},
+  keywords = {practice}
+}
+
+@article{kurtzer2017singularity,
+  author   = {Kurtzer, Gregory M. and Sochat, Vanessa and Bauer, Michael W.},
+  title    = {Singularity: Scientific containers for mobility of compute},
+  journal  = {PLOS ONE},
+  volume   = {12},
+  number   = {5},
+  pages    = {e0177459},
+  year     = {2017},
+  doi      = {10.1371/journal.pone.0177459},
+  keywords = {practice}
+}
+
+@article{nust2020ten,
+  author   = {N{\"u}st, Daniel and Sochat, Vanessa and Marwick, Ben and Eglen, Stephen J. and Head, Tim and Hirst, Tony and Evans, Benjamin D.},
+  title    = {Ten simple rules for writing Dockerfiles for reproducible data science},
+  journal  = {PLOS Computational Biology},
+  volume   = {16},
+  number   = {11},
+  pages    = {e1008316},
+  year     = {2020},
+  doi      = {10.1371/journal.pcbi.1008316},
+  keywords = {practice}
+}
+
+@book{oberkampf2010verification,
+  author    = {Oberkampf, William L. and Roy, Christopher J.},
+  title     = {Verification and Validation in Scientific Computing},
+  publisher = {Cambridge University Press},
+  address   = {Cambridge},
+  year      = {2010},
+  doi       = {10.1017/CBO9780511760396},
+  keywords  = {practice}
+}
+
+@article{barker2022introducing,
+  author   = {Barker, Michelle and Chue Hong, Neil P. and Katz, Daniel S. and Lamprecht, Anna-Lena and Martinez-Ortiz, Carlos and Psomopoulos, Fotis and Harrow, Jennifer and Castro, Leyla Jael and others},
+  title    = {Introducing the {FAIR} Principles for research software},
+  journal  = {Scientific Data},
+  volume   = {9},
+  pages    = {622},
+  year     = {2022},
+  doi      = {10.1038/s41597-022-01710-x},
+  keywords = {practice}
+}
+
+@article{taschuk2017ten,
+  author   = {Taschuk, Morgan and Wilson, Greg},
+  title    = {Ten simple rules for making research software more robust},
+  journal  = {PLOS Computational Biology},
+  volume   = {13},
+  number   = {4},
+  pages    = {e1005412},
+  year     = {2017},
+  doi      = {10.1371/journal.pcbi.1005412},
+  keywords = {practice}
+}
+
+@article{roache2002code,
+  author   = {Roache, Patrick J.},
+  title    = {Code Verification by the Method of Manufactured Solutions},
+  journal  = {Journal of Fluids Engineering},
+  volume   = {124},
+  number   = {1},
+  pages    = {4--10},
+  year     = {2002},
+  doi      = {10.1115/1.1436090},
+  keywords = {practice}
+}
+
+@article{turner2013simulation,
+  author   = {Turner, M. M. and Derzsi, A. and Donk{\'o}, Z. and Eremin, D. and Kelly, S. J. and Lafleur, T. and Mussenbrock, T.},
+  title    = {Simulation benchmarks for low-pressure plasmas: Capacitive discharges},
+  journal  = {Physics of Plasmas},
+  volume   = {20},
+  number   = {1},
+  pages    = {013507},
+  year     = {2013},
+  doi      = {10.1063/1.4775084},
+  keywords = {practice}
+}
+
+@misc{apptainer_mpi,
+  author       = {{Apptainer Project}},
+  title        = {Apptainer and {MPI} applications ({Apptainer} 1.5 User Guide)},
+  howpublished = {\url{https://apptainer.org/docs/user/1.5/mpi.html}},
+  urldate      = {2026-10-17},
+  keywords     = {practice, software}
+}
+
+@misc{monash_m3_containers,
+  author       = {{Monash eResearch}},
+  title        = {{M3}: Containers},
+  howpublished = {\url{https://docs.erc.monash.edu/M3/Software/Containers}},
+  urldate      = {2026-10-17},
+  keywords     = {practice}
+}
+
+@misc{monash_m3_ansys,
+  author       = {{Monash eResearch}},
+  title        = {{M3}: {ANSYS}},
+  howpublished = {\url{https://docs.erc.monash.edu/M3/Software/ANSYS}},
+  urldate      = {2026-10-17},
+  keywords     = {practice}
+}
+
+% =====================================================================================
+% Codes and libraries (CITATION.cff, containers/)
+% =====================================================================================
+
+@inproceedings{fedeli2022pushing,
+  author    = {Fedeli, Luca and Huebl, Axel and Boillod-Cerneux, France and Clark, Thomas and Gott, Kevin and Hillairet, Conrad and Jaure, Stephan and Leblanc, Adrien and others},
+  title     = {Pushing the Frontier in the Design of Laser-Based Electron Accelerators with Groundbreaking Mesh-Refined Particle-In-Cell Simulations on Exascale-Class Supercomputers},
+  booktitle = {SC22: International Conference for High Performance Computing, Networking, Storage and Analysis},
+  pages     = {1--12},
+  year      = {2022},
+  doi       = {10.1109/SC41404.2022.00008},
+  note      = {WarpX reference paper; ACM Gordon Bell Prize 2022},
+  keywords  = {software}
+}
+
+@software{warpx,
+  author   = {{WarpX contributors}},
+  title    = {{WarpX}},
+  version  = {26.01},
+  url      = {https://github.com/BLAST-WarpX/warpx},
+  note     = {Used: 2D-RZ electrostatic PIC + MCC, pywarpx; BoschHaleFusionCrossSection.H cross-checked in physics/core.py},
+  keywords = {software}
+}
+
+@article{zhang2019amrex,
+  author   = {Zhang, Weiqun and Almgren, Ann and Beckner, Vince and Bell, John and Blaschke, Johannes and Chan, Cy and Day, Marcus and Friesen, Brian and Gott, Kevin and Graves, Daniel and Katz, Max and Myers, Andrew and others},
+  title    = {{AMReX}: a framework for block-structured adaptive mesh refinement},
+  journal  = {Journal of Open Source Software},
+  volume   = {4},
+  number   = {37},
+  pages    = {1370},
+  year     = {2019},
+  doi      = {10.21105/joss.01370},
+  note     = {Mesh/particle framework under WarpX},
+  keywords = {software}
+}
+
+@article{romano2015openmc,
+  author   = {Romano, Paul K. and Horelik, Nicholas E. and Herman, Bryan R. and Nelson, Adam G. and Forget, Benoit and Smith, Kord},
+  title    = {{OpenMC}: A state-of-the-art {Monte Carlo} code for research and development},
+  journal  = {Annals of Nuclear Energy},
+  volume   = {82},
+  pages    = {90--97},
+  year     = {2015},
+  doi      = {10.1016/j.anucene.2014.07.048},
+  note     = {OpenMC 0.16.0 used},
+  keywords = {software}
+}
+
+@article{agostinelli2003geant4,
+  author   = {Agostinelli, S. and Allison, J. and Amako, K. and Apostolakis, J. and Araujo, H. and Arce, P. and others},
+  title    = {{Geant4}---a simulation toolkit},
+  journal  = {Nuclear Instruments and Methods in Physics Research Section A},
+  volume   = {506},
+  number   = {3},
+  pages    = {250--303},
+  year     = {2003},
+  doi      = {10.1016/S0168-9002(03)01368-8},
+  note     = {Source of the ICRU 49 coefficients (G4hICRU49p.cc) used in physics/core.py},
+  keywords = {software, physics-stopping}
+}
+
+@article{dalcin2021mpi4py,
+  author   = {Dalcin, Lisandro and Fang, Yao-Lung L.},
+  title    = {mpi4py: Status Update After 12 Years of Development},
+  journal  = {Computing in Science \& Engineering},
+  volume   = {23},
+  number   = {4},
+  pages    = {47--54},
+  year     = {2021},
+  doi      = {10.1109/MCSE.2021.3083216},
+  keywords = {software}
+}
+
+@article{harris2020numpy,
+  author   = {Harris, Charles R. and Millman, K. Jarrod and van der Walt, St{\'e}fan J. and Gommers, Ralf and Virtanen, Pauli and Cournapeau, David and others},
+  title    = {Array programming with {NumPy}},
+  journal  = {Nature},
+  volume   = {585},
+  number   = {7825},
+  pages    = {357--362},
+  year     = {2020},
+  doi      = {10.1038/s41586-020-2649-2},
+  keywords = {software}
+}
+
+@article{virtanen2020scipy,
+  author   = {Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and Haberland, Matt and Reddy, Tyler and Cournapeau, David and others},
+  title    = {{SciPy} 1.0: fundamental algorithms for scientific computing in {Python}},
+  journal  = {Nature Methods},
+  volume   = {17},
+  number   = {3},
+  pages    = {261--272},
+  year     = {2020},
+  doi      = {10.1038/s41592-019-0686-2},
+  keywords = {software}
+}
+
+@article{hunter2007matplotlib,
+  author   = {Hunter, John D.},
+  title    = {Matplotlib: A {2D} Graphics Environment},
+  journal  = {Computing in Science \& Engineering},
+  volume   = {9},
+  number   = {3},
+  pages    = {90--95},
+  year     = {2007},
+  doi      = {10.1109/MCSE.2007.55},
+  keywords = {software}
+}
+
+@article{turk2011yt,
+  author   = {Turk, Matthew J. and Smith, Britton D. and Oishi, Jeffrey S. and Skory, Stephen and Skillman, Samuel W. and Abel, Tom and Norman, Michael L.},
+  title    = {yt: A Multi-code Analysis Toolkit for Astrophysical Simulation Data},
+  journal  = {The Astrophysical Journal Supplement Series},
+  volume   = {192},
+  number   = {1},
+  pages    = {9},
+  year     = {2011},
+  doi      = {10.1088/0067-0049/192/1/9},
+  keywords = {software}
+}
+
+% =====================================================================================
+% Data libraries (data/, OpenMC nuclear data, physics/core.py constants)
+% =====================================================================================
+
+@article{tabata2000analytic,
+  author   = {Tabata, Tatsuo and Shirai, Toshizo},
+  title    = {Analytic Cross Sections for Collisions of {H}+, {H}2+, {H}3+, {H}, {H}2, and {H}- with Hydrogen Molecules},
+  journal  = {Atomic Data and Nuclear Data Tables},
+  volume   = {76},
+  number   = {1},
+  pages    = {1--25},
+  year     = {2000},
+  doi      = {10.1006/adnd.2000.0835},
+  note     = {Reactions 6 (charge exchange), 10 (momentum transfer), 31 (stripping): data/TS2000_*.dat},
+  keywords = {data, physics-atomic}
+}
+
+@misc{warpx_data,
+  author       = {{BLAST-WarpX}},
+  title        = {warpx-data: {MCC} cross sections},
+  howpublished = {\url{https://github.com/BLAST-WarpX/warpx-data}},
+  note         = {Origin of data/TS2000_R6 and TS2000_R31 tables (MCC_cross_sections/H/)},
+  keywords     = {data}
+}
+
+@article{brown2018endf,
+  author   = {Brown, D. A. and Chadwick, M. B. and Capote, R. and Kahler, A. C. and Trkov, A. and Herman, M. W. and others},
+  title    = {{ENDF/B-VIII.0}: The 8th Major Release of the Nuclear Reaction Data Library with {CIELO}-project Cross Sections, New Standards and Thermal Scattering Data},
+  journal  = {Nuclear Data Sheets},
+  volume   = {148},
+  pages    = {1--142},
+  year     = {2018},
+  doi      = {10.1016/j.nds.2018.02.001},
+  note     = {Nuclear data bind-mounted into the OpenMC image},
+  keywords = {data}
+}
+
+@article{tiesinga2021codata,
+  author   = {Tiesinga, Eite and Mohr, Peter J. and Newell, David B. and Taylor, Barry N.},
+  title    = {{CODATA} recommended values of the fundamental physical constants: 2018},
+  journal  = {Reviews of Modern Physics},
+  volume   = {93},
+  number   = {2},
+  pages    = {025010},
+  year     = {2021},
+  doi      = {10.1103/RevModPhys.93.025010},
+  keywords = {data}
+}
+
+% =====================================================================================
+% Fusion
+% =====================================================================================
+
+@article{bosch1992improved,
+  author   = {Bosch, H.-S. and Hale, G. M.},
+  title    = {Improved formulas for fusion cross-sections and thermal reactivities},
+  journal  = {Nuclear Fusion},
+  volume   = {32},
+  number   = {4},
+  pages    = {611--631},
+  year     = {1992},
+  doi      = {10.1088/0029-5515/32/4/I07},
+  keywords = {physics-fusion}
+}
+
+% =====================================================================================
+% Heavy-particle and electron atomic collisions
+% =====================================================================================
+
+@techreport{barnett1990atomic,
+  author      = {Barnett, C. F.},
+  title       = {Atomic Data for Fusion. Volume 1: Collisions of {H}, {H}2, {He} and {Li} Atoms and Ions with Atoms and Molecules},
+  institution = {Oak Ridge National Laboratory},
+  number      = {ORNL-6086},
+  year        = {1990},
+  note        = {"Red Book". Not checked online; verify before citing},
+  keywords    = {physics-atomic}
+}
+
+@article{rudd1983cross,
+  author   = {Rudd, M. E. and DuBois, R. D. and Toburen, L. H. and Ratcliffe, C. A. and Goffe, T. V.},
+  title    = {Cross sections for ionization of gases by 5--4000-{keV} protons and for electron capture by 5--150-{keV} protons},
+  journal  = {Physical Review A},
+  volume   = {28},
+  number   = {6},
+  pages    = {3244--3257},
+  year     = {1983},
+  doi      = {10.1103/PhysRevA.28.3244},
+  keywords = {physics-atomic}
+}
+
+@article{rudd1985electron,
+  author   = {Rudd, M. E. and Kim, Y.-K. and Madison, D. H. and Gallagher, J. W.},
+  title    = {Electron production in proton collisions: total cross sections},
+  journal  = {Reviews of Modern Physics},
+  volume   = {57},
+  number   = {4},
+  pages    = {965--994},
+  year     = {1985},
+  doi      = {10.1103/RevModPhys.57.965},
+  keywords = {physics-atomic}
+}
+
+@article{padovani2009cosmic,
+  author   = {Padovani, M. and Galli, D. and Glassgold, A. E.},
+  title    = {Cosmic-ray ionization of molecular clouds},
+  journal  = {Astronomy \& Astrophysics},
+  volume   = {501},
+  number   = {2},
+  pages    = {619--631},
+  year     = {2009},
+  doi      = {10.1051/0004-6361/200911794},
+  keywords = {physics-atomic}
+}
+
+@article{kim1994binary,
+  author   = {Kim, Yong-Ki and Rudd, M. Eugene},
+  title    = {Binary-encounter-dipole model for electron-impact ionization},
+  journal  = {Physical Review A},
+  volume   = {50},
+  number   = {5},
+  pages    = {3954--3967},
+  year     = {1994},
+  doi      = {10.1103/PhysRevA.50.3954},
+  keywords = {physics-atomic}
+}
+
+@article{rapp1965total,
+  author   = {Rapp, Donald and Englander-Golden, Paula},
+  title    = {Total Cross Sections for Ionization and Attachment in Gases by Electron Impact. {I}. Positive Ionization},
+  journal  = {The Journal of Chemical Physics},
+  volume   = {43},
+  number   = {5},
+  pages    = {1464--1479},
+  year     = {1965},
+  doi      = {10.1063/1.1696957},
+  keywords = {physics-atomic}
+}
+
+@article{straub1996absolute,
+  author   = {Straub, H. C. and Renault, P. and Lindsay, B. G. and Smith, K. A. and Stebbings, R. F.},
+  title    = {Absolute partial cross sections for electron-impact ionization of {H}2, {N}2, and {O}2 from threshold to 1000 {eV}},
+  journal  = {Physical Review A},
+  volume   = {54},
+  number   = {3},
+  pages    = {2146--2153},
+  year     = {1996},
+  doi      = {10.1103/PhysRevA.54.2146},
+  keywords = {physics-atomic}
+}
+
+% =====================================================================================
+% Surface physics: secondary electrons, reflection, implantation
+% =====================================================================================
+
+@article{sternglass1957theory,
+  author   = {Sternglass, E. J.},
+  title    = {Theory of Secondary Electron Emission by High-Speed Ions},
+  journal  = {Physical Review},
+  volume   = {108},
+  number   = {1},
+  pages    = {1--12},
+  year     = {1957},
+  doi      = {10.1103/PhysRev.108.1},
+  keywords = {physics-surface}
+}
+
+@article{baragiola1979ion,
+  author   = {Baragiola, R. A. and Alonso, E. V. and Ferron, J. and Oliva-Florio, A.},
+  title    = {Ion-induced electron emission from clean metals},
+  journal  = {Surface Science},
+  volume   = {90},
+  number   = {2},
+  pages    = {240--255},
+  year     = {1979},
+  doi      = {10.1016/0039-6028(79)90341-8},
+  keywords = {physics-surface}
+}
+
+@incollection{hasselkamp1992kinetic,
+  author    = {Hasselkamp, D.},
+  title     = {Kinetic electron emission from solid surfaces under ion bombardment},
+  booktitle = {Particle Induced Electron Emission {II}},
+  series    = {Springer Tracts in Modern Physics},
+  volume    = {123},
+  publisher = {Springer},
+  address   = {Berlin, Heidelberg},
+  pages     = {1--95},
+  year      = {1992},
+  doi       = {10.1007/BFb0038298},
+  isbn      = {9783540541479},
+  keywords  = {physics-surface}
+}
+
+@article{hill1939emission,
+  author   = {Hill, A. G. and Buechner, W. W. and Clark, J. S. and Fisk, J. B.},
+  title    = {The Emission of Secondary Electrons Under High Energy Positive Ion Bombardment},
+  journal  = {Physical Review},
+  volume   = {55},
+  number   = {5},
+  pages    = {463--470},
+  year     = {1939},
+  doi      = {10.1103/PhysRev.55.463},
+  keywords = {physics-surface}
+}
+
+@misc{khrabrov2024modeling,
+  author        = {Khrabrov, Alexander V. and Smith, David J. and Kaganovich, Igor D.},
+  title         = {Modeling the low-pressure high-voltage branch of the {Paschen} curve for hydrogen and deuterium},
+  year          = {2024},
+  eprint        = {2404.01187},
+  archivePrefix = {arXiv},
+  url           = {https://arxiv.org/abs/2404.01187},
+  keywords      = {physics-surface}
+}
+
+@techreport{eckstein2002calculated,
+  author      = {Eckstein, W.},
+  title       = {Calculated Sputtering, Reflection and Range Values},
+  institution = {Max-Planck-Institut f{\"u}r Plasmaphysik},
+  address     = {Garching},
+  number      = {IPP 9/132},
+  year        = {2002},
+  note        = {Not checked online; verify before citing},
+  keywords    = {physics-surface}
+}
+
+@article{morozov2016structural,
+  author   = {Morozov, Oleksandr and Zhurba, Volodymir and Neklyudov, Ivan and Mats, Oleksandr and Progolaieva, Viktoria and Boshko, Valerian},
+  title    = {Structural Transformations in Austenitic Stainless Steel Induced by Deuterium Implantation: Irradiation at 295 {K}},
+  journal  = {Nanoscale Research Letters},
+  volume   = {11},
+  pages    = {44},
+  year     = {2016},
+  doi      = {10.1186/s11671-016-1251-x},
+  note     = {Cited in analysis/postprocess.py as "11 (2016) 1251" -- 1251 is the DOI suffix; article number is 44},
+  keywords = {physics-surface}
+}
+
+% =====================================================================================
+% Stopping powers
+% =====================================================================================
+
+@book{icru1993report49,
+  author    = {{International Commission on Radiation Units and Measurements}},
+  title     = {Stopping Powers and Ranges for Protons and Alpha Particles},
+  series    = {ICRU Report},
+  number    = {49},
+  publisher = {ICRU},
+  address   = {Bethesda, MD},
+  year      = {1993},
+  keywords  = {physics-stopping}
+}
+
+% =====================================================================================
+% Thermal properties and thermionic emission (tungsten grid)
+% =====================================================================================
+
+@article{forsythe1925properties,
+  author   = {Forsythe, W. E. and Worthing, A. G.},
+  title    = {The Properties of Tungsten and the Characteristics of Tungsten Lamps},
+  journal  = {The Astrophysical Journal},
+  volume   = {61},
+  pages    = {146},
+  year     = {1925},
+  doi      = {10.1086/142880},
+  keywords = {physics-thermal}
+}
+
+@article{matsumoto1999hemispherical,
+  author   = {Matsumoto, T. and Cezairliyan, A. and Basak, D.},
+  title    = {Hemispherical Total Emissivity of Niobium, Molybdenum, and Tungsten at High Temperatures Using a Combined Transient and Brief Steady-State Technique},
+  journal  = {International Journal of Thermophysics},
+  volume   = {20},
+  number   = {3},
+  pages    = {943--952},
+  year     = {1999},
+  doi      = {10.1023/A:1022699622719},
+  note     = {Cited in physics/core.py as "20 (1999) 1539", which matches no paper; this is the 1999 tungsten paper. Check it supports the 300-1000 K values quoted},
+  keywords = {physics-thermal}
+}
+
+@article{white1997thermophysical,
+  author   = {White, G. K. and Minges, M. L.},
+  title    = {Thermophysical properties of some key solids: An update},
+  journal  = {International Journal of Thermophysics},
+  volume   = {18},
+  number   = {5},
+  pages    = {1269--1327},
+  year     = {1997},
+  doi      = {10.1007/BF02575261},
+  keywords = {physics-thermal}
+}
+
+@article{dushman1927electron,
+  author   = {Dushman, S. and Ewald, Jessie W.},
+  title    = {Electron Emission from Thoriated Tungsten},
+  journal  = {Physical Review},
+  volume   = {29},
+  number   = {6},
+  pages    = {857--870},
+  year     = {1927},
+  doi      = {10.1103/PhysRev.29.857},
+  note     = {Cited in physics/core.py as "Dushman & Ewald 1923"; the paper is 1927},
+  keywords = {physics-thermal}
+}
+
+@book{crc_handbook,
+  editor    = {Rumble, John R.},
+  title     = {{CRC} Handbook of Chemistry and Physics},
+  publisher = {CRC Press},
+  address   = {Boca Raton, FL},
+  note      = {Cited for the reproduced Forsythe & Worthing W emissivity; edition not recorded in the code -- set it},
+  keywords  = {physics-thermal}
+}
+
+% =====================================================================================
+% Bremsstrahlung / X-rays
+% =====================================================================================
+
+@article{kramers1923theory,
+  author   = {Kramers, H. A.},
+  title    = {On the theory of {X}-ray absorption and of the continuous {X}-ray spectrum},
+  journal  = {The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science},
+  volume   = {46},
+  number   = {275},
+  pages    = {836--871},
+  year     = {1923},
+  doi      = {10.1080/14786442308565244},
+  keywords = {physics-xray}
+}
+
+@book{compton1935xrays,
+  author    = {Compton, Arthur H. and Allison, Samuel K.},
+  title     = {X-Rays in Theory and Experiment},
+  edition   = {2},
+  publisher = {D. Van Nostrand},
+  address   = {New York},
+  year      = {1935},
+  note      = {Thick-target efficiency eta ~ 1.1e-9 Z V. Not checked online; verify before citing},
+  keywords  = {physics-xray}
+}
+
+% =====================================================================================
+% Dose and materials (openmc/dose.py)
+% =====================================================================================
+
+@article{icrp1996publication74,
+  author   = {{International Commission on Radiological Protection}},
+  title    = {Conversion Coefficients for use in Radiological Protection against External Radiation. {ICRP} Publication 74},
+  journal  = {Annals of the ICRP},
+  volume   = {26},
+  number   = {3--4},
+  year     = {1996},
+  note     = {H*(10) coefficients via openmc.data.dose_coefficients(data_source="icrp74")},
+  keywords = {dose}
+}
+
+@misc{nist_star_compositions,
+  author       = {{National Institute of Standards and Technology}},
+  title        = {{ESTAR/PSTAR/ASTAR} Material Composition Data},
+  howpublished = {\url{https://physics.nist.gov/cgi-bin/Star/compos.pl}},
+  note         = {Borosilicate glass (Pyrex) and Portland concrete compositions in openmc/dose.py. Which NIST table was used is not recorded in the code -- confirm},
+  keywords     = {materials}
+}

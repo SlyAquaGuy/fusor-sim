@@ -16,12 +16,16 @@ build() {   # build <component> [extra apptainer build args]
   local c="$1"; shift
   local out="sif/${c}-${VERSION}.sif"
   echo "==> $c -> $out (git $GIT_DESC)"
-  apptainer build --fakeroot --force --build-arg "FUSORSIM_GIT=$GIT_DESC" "$@" "$out" "containers/${c}.def"
+  # apptainer rejects unused build args, so only pass the git description where the .def declares it
+  if grep -q 'FUSORSIM_GIT=' "containers/${c}.def"; then set -- --build-arg "FUSORSIM_GIT=$GIT_DESC" "$@"; fi
+  apptainer build --fakeroot --force "$@" "$out" "containers/${c}.def"
   ln -sf "${c}-${VERSION}.sif" "sif/${c}.sif"
   sha256sum "$out" | tee "$out.sha256"
 }
 
-need() { [ -e "sif/$1.sif" ] || build "$1"; }
+need() {   # not `[ -e ] || build`: set -e is ignored on the right of ||, so a failed build would continue
+  if [ ! -e "sif/$1.sif" ]; then build "$1"; fi
+}
 
 [ $# -eq 0 ] && set -- mpi-base warpx openmc analysis viz ansys
 for c in "$@"; do
