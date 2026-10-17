@@ -40,8 +40,9 @@ The image uses OpenMPI's *internal* PMIx; if the host `srun` speaks a different 
 
 ## Status
 
-* Done and verified: serial path through the package; `--case`; unit tests.
-* Written, **not built or run**: all `.def` files, `build.sh`, Slurm scripts.
+* Done and verified: serial path through the package; `--case`; unit tests; `mpi-base` (OpenMPI 4.1.6),
+  `warpx` and `analysis` images built in WSL; serial `coarse_test` run in the warpx image.
+* Written, **not built or run**: `openmc`, `viz`, `ansys` `.def` files; Slurm scripts.
 * MPI code paths (`SIZE > 1`) are untested. Known things to check when first run under `mpirun -n 2`:
   1. pywarpx field access (`PhiFPWrapper(0)[...]`) returns the **global** array on every rank (else the vacuum map is wrong);
   2. `add_particles(..., unique_particles=True)` really keeps each rank's particles (particle count conserved);

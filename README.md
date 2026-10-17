@@ -41,6 +41,7 @@ apptainer exec --bind $PWD/src:/opt/fusor-sim/src sif/warpx.sif \
     python3 -c "import fusorsim"               # live-edit code against frozen dependencies
 OMP_NUM_THREADS=8 apptainer run sif/warpx.sif --case cases/coarse_test.yaml --outdir runs/coarse_test
 apptainer run sif/analysis.sif runs/coarse_test                            # -> post/report.md
+fusor-monitor --runs runs                      # live progress page: http://localhost:8050 (stdlib only)
 # WSL has no host MPI: use the image's mpirun (on M3 the host srun launches the image instead)
 apptainer exec sif/warpx.sif mpirun -n 2 fusor-warpx --case cases/coarse_test.yaml --outdir runs/t2
 ```
@@ -65,6 +66,8 @@ seed and all derived inputs. Results are reproducible for a fixed (seed, number 
 
 ## Status
 
-Verified: package imports, physics self-test, preflight via `--case`, unit tests.
-**Not yet verified:** container builds, MPI runs (the driver's MPI path has only been exercised with one rank),
-M3 launch. See [docs/mpi.md](docs/mpi.md#status).
+Verified: package imports, physics self-test, preflight via `--case`, unit tests; `mpi-base`, `warpx` and
+`analysis` images built in WSL (2026-10-17); serial `coarse_test` run in the warpx image (1 rank x 16 threads,
+263 s) and post-processed in the analysis image.
+**Not yet verified:** `openmc`, `viz`, `ansys` image builds, MPI runs (the driver's MPI path has only been
+exercised with one rank), M3 launch. See [docs/mpi.md](docs/mpi.md#status).

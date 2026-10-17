@@ -21,9 +21,13 @@ fusor-warpx = "fusorsim.cli:warpx"
 fusor-post = "fusorsim.cli:post"
 fusor-openmc = "fusorsim.cli:openmc"
 fusor-viz = "fusorsim.cli:viz"
+fusor-monitor = "fusorsim.monitor:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+fusorsim = ["monitor.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

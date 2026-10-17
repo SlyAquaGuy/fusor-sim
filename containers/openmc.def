@@ -17,7 +17,7 @@ From: sif/mpi-base.sif
     containers/lock/openmc.txt /opt/lock.txt
 
 %post
-    export PATH=/opt/mpi/bin:$PATH LD_LIBRARY_PATH=/opt/mpi/lib:$LD_LIBRARY_PATH
+    export PATH=/opt/venv/bin:/opt/mpi/bin:$PATH LD_LIBRARY_PATH=/opt/mpi/lib:$LD_LIBRARY_PATH
     cd /tmp
     V={{ HDF5_VERSION }}; MM=${V%.*}
     wget -q https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-${MM}/hdf5-${V}/src/hdf5-${V}.tar.gz
@@ -36,7 +36,7 @@ From: sif/mpi-base.sif
     python3 -m pip install --no-cache-dir --no-deps /opt/fusor-sim
 
 %environment
-    export PATH=/opt/openmc/bin:/opt/mpi/bin:$PATH
+    export PATH=/opt/venv/bin:/opt/openmc/bin:/opt/mpi/bin:$PATH
     export LD_LIBRARY_PATH=/opt/openmc/lib64:/opt/openmc/lib:/opt/hdf5/lib:/opt/mpi/lib:$LD_LIBRARY_PATH
     export FUSORSIM_DATA=/opt/fusor-sim/data
     export FUSORSIM_GIT={{ FUSORSIM_GIT }}

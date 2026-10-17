@@ -86,5 +86,6 @@ containers/build.sh analysis
 # runs
 OMP_NUM_THREADS=8 apptainer run sif/warpx.sif --case cases/coarse_test.yaml --outdir runs/coarse_test
 apptainer run sif/analysis.sif runs/coarse_test                   # -> runs/coarse_test/post/report.md
+fusor-monitor --runs runs                                          # live progress page, http://localhost:8050
 apptainer exec sif/warpx.sif mpirun -n 2 fusor-warpx --case cases/coarse_test.yaml --outdir runs/ct_np2
 ```

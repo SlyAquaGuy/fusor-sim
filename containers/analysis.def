@@ -16,11 +16,14 @@ From: rockylinux:9
 
 %post
     dnf -y install python{{ PYTHON }} python{{ PYTHON }}-pip && dnf clean all
-    alternatives --set python3 /usr/bin/python{{ PYTHON }} || true
+    # python3 stays the system 3.9 (dnf needs it); our Python is a venv first on PATH
+    python{{ PYTHON }} -m venv /opt/venv
+    export PATH=/opt/venv/bin:$PATH
     python3 -m pip install --no-cache-dir -r /opt/lock.txt
     python3 -m pip install --no-cache-dir --no-deps /opt/fusor-sim
 
 %environment
+    export PATH=/opt/venv/bin:$PATH
     export FUSORSIM_DATA=/opt/fusor-sim/data
     export FUSORSIM_GIT={{ FUSORSIM_GIT }}
     export MPLBACKEND=Agg

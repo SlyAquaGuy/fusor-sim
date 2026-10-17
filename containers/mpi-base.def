@@ -15,7 +15,9 @@ From: rockylinux:9
     dnf -y install gcc gcc-c++ gfortran make cmake git wget which patch bzip2 xz \
         libevent-devel hwloc-devel ucx-devel rdma-core-devel zlib-devel openssl-devel \
         python{{ PYTHON }} python{{ PYTHON }}-devel python{{ PYTHON }}-pip
-    alternatives --set python3 /usr/bin/python{{ PYTHON }} || true
+    # python3 stays the system 3.9 (dnf needs it); our Python is a venv first on PATH
+    python{{ PYTHON }} -m venv /opt/venv
+    export PATH=/opt/venv/bin:$PATH
     cd /tmp
     V={{ OMPI_VERSION }}; MM=${V%.*}
     wget -q https://download.open-mpi.org/release/open-mpi/v${MM}/openmpi-${V}.tar.bz2
@@ -28,7 +30,7 @@ From: rockylinux:9
     python3 -m pip install --no-cache-dir -U pip wheel setuptools
 
 %environment
-    export PATH=/opt/mpi/bin:$PATH
+    export PATH=/opt/venv/bin:/opt/mpi/bin:$PATH
     export LD_LIBRARY_PATH=/opt/mpi/lib:$LD_LIBRARY_PATH
 
 %labels

@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fusor Run Monitor</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10); --window: rgba(42,120,214,0.06);
+  --s1: #2a78d6; --s2: #eb6834;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --window: rgba(57,135,229,0.10);
+    --s1: #3987e5; --s2: #d95926;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --window: rgba(57,135,229,0.10);
+  --s1: #3987e5; --s2: #d95926;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink);
+       font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+h1 { font-size: 18px; margin: 0 8px 0 0; font-weight: 600; }
+select, button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border);
+                 border-radius: 6px; padding: 4px 8px; }
+button { cursor: pointer; }
+.spacer { flex: 1; }
+.muted { color: var(--muted); }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+        border: 1px solid var(--border); background: var(--surface); font-weight: 600; }
+.chip svg { width: 14px; height: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.tile .label { color: var(--ink-2); font-size: 12px; }
+.tile .value { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.tile .sub { color: var(--muted); font-size: 12px; }
+.bar { height: 6px; background: var(--grid); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--s1); border-radius: 3px; transition: width .4s; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.chart h2 { font-size: 13px; font-weight: 600; margin: 0; }
+.chart .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.legend { display: flex; gap: 12px; color: var(--ink-2); font-size: 12px; }
+.legend i { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 4px; }
+.legend i.dash { background: none; border-top: 2px dashed var(--muted); height: 0; }
+.chart svg { display: block; width: 100%; height: 180px; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tip { position: fixed; pointer-events: none; background: var(--surface); color: var(--ink);
+       border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px;
+       box-shadow: 0 2px 8px rgba(0,0,0,.12); display: none; z-index: 10; white-space: nowrap; }
+.tip b { font-variant-numeric: tabular-nums; }
+pre { margin: 0; max-height: 300px; overflow: auto; font: 12px/1.45 ui-monospace, Consolas, monospace;
+      color: var(--ink-2); white-space: pre-wrap; word-break: break-all; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--grid); }
+th { color: var(--ink-2); font-weight: 600; }
+.tablewrap { overflow-x: auto; }
+.section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.section-title h2 { font-size: 13px; margin: 0; }
+.params { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2px 16px;
+          font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+.params span { color: var(--ink); font-variant-numeric: tabular-nums; }
+.empty { padding: 40px; text-align: center; color: var(--muted); }
+@media (max-width: 420px) { .charts { grid-template-columns: 1fr; } .tile .value { font-size: 18px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Fusor run monitor</h1>
+    <select id="run" aria-label="Run"></select>
+    <span id="status"></span>
+    <span class="spacer"></span>
+    <span class="muted" id="updated"></span>
+    <button id="pause" type="button">Pause</button>
+    <button id="theme" type="button" aria-label="Toggle theme">Theme</button>
+  </header>
+  <div id="body"><div class="empty">Loading runs…</div></div>
+</main>
+<div class="tip" id="tip"></div>
+<script>
+"use strict";
+const POLL_MS = 5000;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const NS = "http://www.w3.org/2000/svg";
+let current = null, data = null, paused = false, hoverT = null, timer = null;
+
+// ---------- theme toggle (per-viewer convenience only) ----------
+function setTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+try { setTheme(localStorage.getItem("fusor-theme")); } catch (e) {}
+$("#theme").onclick = () => {
+  const dark = getComputedStyle(document.documentElement).colorScheme.includes("dark");
+  const t = dark ? "light" : "dark"; setTheme(t);
+  try { localStorage.setItem("fusor-theme", t); } catch (e) {}
+  if (data) render(data);
+};
+$("#pause").onclick = () => { paused = !paused; $("#pause").textContent = paused ? "Resume" : "Pause"; if (!paused) poll(); };
+
+// ---------- formatting ----------
+function sci(v, d = 3) { if (v == null || !isFinite(v)) return "–"; if (v === 0) return "0";
+  const a = Math.abs(v); return (a >= 1e4 || a < 1e-2) ? v.toExponential(d - 1).replace("e+", "e") : v.toPrecision(d); }
+function dur(s) { if (s == null || !isFinite(s)) return "–"; s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return h ? `${h} h ${m} min` : m ? `${m} min ${x} s` : `${x} s`; }
+function ago(ts) { return dur(Date.now() / 1000 - ts) + " ago"; }
+
+const STATUS = {
+  running:   { color: "var(--good)",     label: "Running",   icon: '<circle cx="7" cy="7" r="5" fill="currentColor"/>' },
+  done:      { color: "var(--good)",     label: "Done",      icon: '<path d="M2.5 7.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2"/>' },
+  stopped:   { color: "var(--warning)",  label: "Stopped (no updates)", icon: '<rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor"/>' },
+  failed:    { color: "var(--critical)", label: "Failed",    icon: '<path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="2"/>' },
+  preflight: { color: "var(--muted)",    label: "Preflight / not started", icon: '<circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="2"/>' },
+};
+function chip(s) { const x = STATUS[s] || STATUS.preflight;
+  return `<span class="chip"><svg viewBox="0 0 14 14" style="color:${x.color}" aria-hidden="true">${x.icon}</svg>${x.label}</span>`; }
+
+// ---------- data ----------
+async function getJSON(u) { const r = await fetch(u, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.json(); }
+
+async function loadRuns() {
+  const runs = await getJSON("/api/runs");
+  const sel = $("#run"), keep = current;
+  sel.innerHTML = runs.map(r => `<option value="${esc(r.name)}">${esc(r.name)} —${(STATUS[r.status] || {}).label || r.status}</option>`).join("");
+  if (!runs.length) { $("#body").innerHTML = '<div class="empty">No runs with run_params.json under the runs directory yet.</div>'; return; }
+  let want = new URLSearchParams(location.search).get("run") || keep;
+  if (!runs.some(r => r.name === want)) want = (runs.find(r => r.status === "running") || runs[0]).name;
+  sel.value = current = want;
+}
+$("#run").onchange = (e) => { current = e.target.value; hoverT = null;
+  history.replaceState(null, "", "?run=" + encodeURIComponent(current)); poll(); };
+
+async function poll() {
+  clearTimeout(timer);
+  try {
+    await loadRuns();
+    if (current) { data = await getJSON("/api/run?name=" + encodeURIComponent(current)); render(data); }
+    $("#updated").textContent = "updated " + new Date().toLocaleTimeString();
+  } catch (e) { $("#updated").textContent = "server unreachable (" + e.message + ")"; }
+  if (!paused) timer = setTimeout(poll, document.hidden ? POLL_MS * 6 : POLL_MS);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !paused) poll(); });
+
+// ---------- charts ----------
+const CHARTS = [
+  { id: "I", title: "Supply current", unit: "mA", zero: true, series: [{ key: "I_ema", label: "I (30 ns EMA)", color: "var(--s1)", k: 1e3 }],
+    ref: d => d.params.I_target != null ? { v: d.params.I_target * 1e3, label: "target" } : null },
+  { id: "Y", title: "Neutron rate", unit: "n/s", zero: true,
+    series: [{ key: "fus_ion_n_rate", label: "D⁺ beam–gas", color: "var(--s1)" },
+             { key: "fus_neu_n_rate", label: "fast neutrals", color: "var(--s2)" }] },
+  { id: "A", title: "Controller α (makeup factor)", unit: "", series: [{ key: "alpha", label: "α", color: "var(--s1)" }],
+    ref: () => ({ v: 1, label: "α = 1" }) },
+  { id: "N", title: "Ion macroparticles", unit: "", zero: true, series: [{ key: "n_macro", label: "n_macro", color: "var(--s1)" }],
+    ref: d => d.params.n_macro_target != null ? { v: d.params.n_macro_target, label: "target" } : null },
+  { id: "C", title: "Particle CFL (max cell / step)", unit: "", zero: true, series: [{ key: "vmax_cfl", label: "CFL", color: "var(--s1)" }],
+    ref: () => ({ v: 0.95, label: "limit 0.95" }) },
+];
+
+function niceTicks(lo, hi, n = 4) {
+  if (!(hi > lo)) { hi = lo + (Math.abs(lo) || 1); }
+  const raw = (hi - lo) / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= raw);
+  const a = Math.floor(lo / step) * step, b = Math.ceil(hi / step) * step, t = [];
+  for (let v = a; v <= b + step * 1e-9; v += step) t.push(+v.toPrecision(12));
+  return t;
+}
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+
+function drawChart(card, spec, d) {
+  const svg = card.querySelector("svg"); svg.innerHTML = "";
+  const W = svg.clientWidth || 360, H = 180, m = { l: 52, r: 14, t: 8, b: 22 };
+  const t = (d.series.t || []).map(v => v * 1e6);
+  const ys = spec.series.map(s => (d.series[s.key] || []).map(v => v * (s.k || 1)));
+  if (!t.length) { el("text", { x: W / 2, y: H / 2, "text-anchor": "middle" }, svg).textContent = "waiting for first timeseries rows…"; return; }
+  const ref = spec.ref ? spec.ref(d) : null;
+  const all = ys.flat().filter(isFinite).concat(ref ? [ref.v] : []);
+  let lo = Math.min(...all), hi = Math.max(...all);
+  if (spec.zero) lo = Math.min(0, lo);
+  const pad = (hi - lo) * 0.06 || Math.abs(hi) * 0.1 || 1; if (!spec.zero) lo -= pad; hi += pad;
+  const yt = niceTicks(lo, hi); lo = yt[0]; hi = yt[yt.length - 1];
+  const tEnd = (d.params.t_end || 0) * 1e6 || Math.max(...t);
+  const xt = niceTicks(0, tEnd, Math.max(2, Math.floor(W / 90)));
+  const X = v => m.l + (v / xt[xt.length - 1]) * (W - m.l - m.r), Y = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  // averaging window (steady-state tallies) shaded behind everything
+  if (d.params.t_avg != null) {
+    const xa = X(d.params.t_avg * 1e6);
+    el("rect", { x: xa, y: m.t, width: Math.max(0, X(tEnd) - xa), height: H - m.t - m.b, fill: "var(--window)" }, svg);
+  }
+  for (const v of yt) {
+    el("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }, svg);
+    el("text", { x: m.l - 6, y: Y(v) + 4, "text-anchor": "end" }, svg).textContent = sci(v, 2);
+  }
+  for (const v of xt) el("text", { x: X(v), y: H - 6, "text-anchor": "middle" }, svg).textContent = v === xt[xt.length - 1] ? sci(v, 2) + " µs" : sci(v, 2);
+  if (ref) {
+    el("line", { x1: m.l, x2: W - m.r, y1: Y(ref.v), y2: Y(ref.v), stroke: "var(--muted)", "stroke-width": 1.5, "stroke-dasharray": "5 4" }, svg);
+    el("text", { x: W - m.r, y: Y(ref.v) - 4, "text-anchor": "end" }, svg).textContent = ref.label;
+  }
+  spec.series.forEach((s, j) => {
+    const pts = ys[j].map((v, i) => isFinite(v) ? `${X(t[i]).toFixed(1)},${Y(v).toFixed(1)}` : null).filter(Boolean);
+    el("polyline", { points: pts.join(" "), fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+  });
+  // hover layer: crosshair + one dot per series, synced across charts by time
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: "var(--axis)", "stroke-width": 1, visibility: "hidden" }, svg);
+  const dots = spec.series.map(s => el("circle", { r: 4, fill: s.color, stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" }, svg));
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  card._hover = (tt, ev) => {
+    if (tt == null) { cross.setAttribute("visibility", "hidden"); dots.forEach(c => c.setAttribute("visibility", "hidden")); return null; }
+    let i = 0, lo2 = 0, hi2 = t.length - 1;
+    while (lo2 < hi2) { const mid = (lo2 + hi2) >> 1; if (t[mid] < tt) lo2 = mid + 1; else hi2 = mid; }
+    i = (lo2 > 0 && Math.abs(t[lo2 - 1] - tt) < Math.abs(t[lo2] - tt)) ? lo2 - 1 : lo2;
+    cross.setAttribute("x1", X(t[i])); cross.setAttribute("x2", X(t[i])); cross.setAttribute("visibility", "visible");
+    spec.series.forEach((s, j) => { const v = ys[j][i]; if (!isFinite(v)) return;
+      dots[j].setAttribute("cx", X(t[i])); dots[j].setAttribute("cy", Y(v)); dots[j].setAttribute("visibility", "visible"); });
+    return { i, t: t[i], vals: spec.series.map((s, j) => ({ s, v: ys[j][i] })) };
+  };
+  const move = (ev) => {
+    const r = svg.getBoundingClientRect(), px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+    hoverT = Math.max(0, (px - m.l) / (W - m.l - m.r)) * xt[xt.length - 1];
+    syncHover(card, ev);
+  };
+  hit.addEventListener("mousemove", move); hit.addEventListener("touchmove", move, { passive: true });
+  hit.addEventListener("mouseleave", () => { hoverT = null; syncHover(null); });
+}
+
+function syncHover(src, ev) {
+  const tip = $("#tip");
+  let info = null;
+  document.querySelectorAll(".chart").forEach(c => { const r = c._hover && c._hover(hoverT); if (c === src) info = r; });
+  if (!info || !ev) { tip.style.display = "none"; return; }
+  const spec = CHARTS.find(s => s.id === src.dataset.id);
+  tip.innerHTML = `<div class="muted">t = ${sci(info.t, 4)} µs · step ${sci((data.series.step || [])[info.i], 6)}</div>` +
+    info.vals.map(({ s, v }) => `<div><span style="color:${s.color}">━</span> ${s.label}: <b>${sci(v, 4)}</b> ${spec.unit}</div>`).join("");
+  tip.style.display = "block";
+  const x = (ev.touches ? ev.touches[0].clientX : ev.clientX), y = (ev.touches ? ev.touches[0].clientY : ev.clientY);
+  const w = tip.offsetWidth; tip.style.left = Math.min(x + 14, innerWidth - w - 8) + "px"; tip.style.top = (y + 14) + "px";
+}
+
+// ---------- page ----------
+function render(d) {
+  $("#status").innerHTML = chip(d.status);
+  const p = d.params, L = d.last || {}, pct = (d.frac * 100);
+  const steps = L.step != null ? `step ${Math.round(L.step).toLocaleString()} / ${(p.max_steps || 0).toLocaleString()}` : "no steps yet";
+  const inWin = L.t != null && p.t_avg != null && L.t >= p.t_avg;
+  const tiles = [
+    { label: "Progress (simulated time)", value: pct.toFixed(1) + " %", sub: `${sci((L.t || 0) * 1e6, 3)} / ${sci((p.t_end || 0) * 1e6, 3)} µs · ${steps}`, bar: pct },
+    { label: d.status === "running" ? "Wall time · ETA" : "Wall time", value: dur(d.wall_s), sub: d.eta_s != null ? "≈ " + dur(d.eta_s) + " left" : `last write ${ago(d.last_change)}` },
+    { label: "Supply current", value: L.I_ema != null ? sci(L.I_ema * 1e3, 3) + " mA" : "–", sub: p.I_target != null ? `target ${sci(p.I_target * 1e3, 3)} mA` : "" },
+    { label: "Neutrons (beam–gas + fast neutral)", value: L.fus_ion_n_rate != null ? sci((L.fus_ion_n_rate || 0) + (L.fus_neu_n_rate || 0), 3) + " /s" : "–",
+      sub: inWin ? "in averaging window" : (p.t_avg != null ? `averaging starts at ${sci(p.t_avg * 1e6, 3)} µs` : "") },
+    { label: "Controller α", value: L.alpha != null ? sci(L.alpha, 3) : "–", sub: L.boot_frac > 0 ? `bootstrap source ${(L.boot_frac * 100).toFixed(0)} %` : "bootstrap off" },
+  ];
+  let html = `<div class="tiles">` + tiles.map(x => `<div class="card tile"><div class="label">${x.label}</div><div class="value">${x.value}</div>` +
+    `<div class="sub">${x.sub}</div>${x.bar != null ? `<div class="bar"><div style="width:${Math.min(100, x.bar)}%"></div></div>` : ""}</div>`).join("") + `</div>`;
+  html += `<div class="charts">` + CHARTS.map(s => `<div class="card chart" data-id="${s.id}"><div class="head"><h2>${s.title}${s.unit ? ` (${s.unit})` : ""}</h2>` +
+    `<div class="legend">${s.series.length > 1 ? s.series.map(x => `<span><i style="background:${x.color}"></i>${x.label}</span>`).join("") : ""}` +
+    `${s.ref ? `<span><i class="dash"></i>reference</span>` : ""}</div></div><svg role="img" aria-label="${s.title} vs time"></svg></div>`).join("") + `</div>`;
+  html += `<div class="card" style="margin-bottom:12px"><div class="section-title"><h2>Latest rows</h2><span class="muted">${d.n_rows.toLocaleString()} rows · shaded = averaging window</span></div>` +
+    `<div class="tablewrap">${table(d)}</div></div>`;
+  html += `<div class="card"><div class="section-title"><h2>Log</h2><span class="muted">${esc(d.log || "no log found (see fusor-monitor --help)")}</span></div>` +
+    `<pre id="log"></pre><div class="params">${Object.entries(p).filter(([, v]) => v != null).map(([k, v]) => `<div>${k}: <span>${Number.isInteger(v) ? v : typeof v === "number" ? sci(v, 4) : esc(v)}</span></div>`).join("")}</div></div>`;
+  const logEl = $("#log"), atBottom = !logEl || logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 4;
+  $("#body").innerHTML = html;
+  const pre = $("#log"); pre.textContent = (d.log_tail || []).join("\n"); if (atBottom) pre.scrollTop = pre.scrollHeight;
+  document.querySelectorAll(".chart").forEach(c => drawChart(c, CHARTS.find(s => s.id === c.dataset.id), d));
+  if (hoverT != null) syncHover(null);
+}
+
+function table(d) {
+  const s = d.series, n = (s.t || []).length; if (!n) return '<div class="muted">no rows yet</div>';
+  const cols = [["t", "t (µs)", 1e6], ["step", "step", 1], ["I_ema", "I (mA)", 1e3], ["alpha", "α", 1], ["n_macro", "n_macro", 1],
+                ["fus_ion_n_rate", "beam–gas (n/s)", 1], ["fus_neu_n_rate", "fast neutral (n/s)", 1], ["vmax_cfl", "CFL", 1]].filter(c => s[c[0]]);
+  let h = "<table><thead><tr>" + cols.map(c => `<th>${c[1]}</th>`).join("") + "</tr></thead><tbody>";
+  for (let i = n - 1; i >= Math.max(0, n - 8); i--) h += "<tr>" + cols.map(c => `<td>${sci(s[c[0]][i] * c[2], 4)}</td>`).join("") + "</tr>";
+  return h + "</tbody></table>";
+}
+
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => data && render(data), 150); });
+poll();
+</script>
+</body>
+</html>
