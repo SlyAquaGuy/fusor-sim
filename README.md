@@ -23,19 +23,26 @@ Slurm + MPI). Layout, conventions and the references behind them: [docs/](docs/)
 
 ## Develop (WSL)
 
+Clone into the WSL filesystem (`~/fusor-sim`), not `/mnt/<drive>`: builds there are slow and symlinks/permissions misbehave.
+
 ```bash
+python3 -m venv .venv && . .venv/bin/activate
 pip install -e '.[test]'                       # or: PYTHONPATH=src
 pytest tests/unit
 fusor-warpx --case cases/coarse_test.yaml --preflight --outdir runs/pf    # no WarpX needed
 ```
 
-Build and use the images (needs `apptainer`; `sudo apt install apptainer` / see apptainer.org):
+Build and use the images (Ubuntu: `sudo add-apt-repository -y ppa:apptainer/ppa && sudo apt install -y apptainer`):
 
 ```bash
 containers/build.sh warpx                      # -> sif/warpx-<ver>.sif (+ mpi-base)
+containers/build.sh analysis
 apptainer exec --bind $PWD/src:/opt/fusor-sim/src sif/warpx.sif \
     python3 -c "import fusorsim"               # live-edit code against frozen dependencies
-mpirun -n 4 apptainer exec sif/warpx.sif fusor-warpx --case cases/coarse_test.yaml --outdir runs/t4
+OMP_NUM_THREADS=8 apptainer run sif/warpx.sif --case cases/coarse_test.yaml --outdir runs/coarse_test
+apptainer run sif/analysis.sif runs/coarse_test                            # -> post/report.md
+# WSL has no host MPI: use the image's mpirun (on M3 the host srun launches the image instead)
+apptainer exec sif/warpx.sif mpirun -n 2 fusor-warpx --case cases/coarse_test.yaml --outdir runs/t2
 ```
 
 ## Deploy (M3)

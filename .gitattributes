@@ -1,0 +1,13 @@
+* text=auto
+# scripts and container recipes run in Linux (WSL / M3): always LF
+*.sh     text eol=lf
+*.def    text eol=lf
+*.slurm  text eol=lf
+*.py     text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.txt    text eol=lf
+*.dat    text eol=lf
+*.png    binary
+*.mp4    binary
+*.sif    binary
