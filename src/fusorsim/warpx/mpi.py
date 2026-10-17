@@ -38,6 +38,16 @@ def allmax(x):
     return COMM.allreduce(x, op=MPI.MAX) if SIZE > 1 else x
 
 
+def allgather(obj):
+    """List of every rank's obj (rank order) on every rank. Collective."""
+    return COMM.allgather(obj) if SIZE > 1 else [obj]
+
+
+def gather(obj, root=0):
+    """List of every rank's obj on `root`, None elsewhere. Collective."""
+    return COMM.gather(obj, root=root) if SIZE > 1 else [obj]
+
+
 def rank_rng(seed):
     """Independent, reproducible stream per rank: SeedSequence(seed).spawn(SIZE)[RANK].
     Results are reproducible for a fixed (seed, SIZE), not across different SIZE."""

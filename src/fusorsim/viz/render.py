@@ -19,15 +19,13 @@ Writes into <run_dir>/viz/:
   spectra.png          cathode ion impact energies, wall fast-neutral energies,
                        electron energies at the wall, reacting-deuteron energies
                        and the neutron spectrum
-  ions_movie.mp4/.gif  every ion snapshot as a frame, 3D positions projected on a
-                       side view, coloured by energy           (--movie)
-  ion_tracks.png       paths of individual ions followed by particle id  (--movie)
+  ion_tracks.png       paths of --n-tracks ions, sampled every callback (~1.5 ns),
+                       coloured by energy; x = ion lost (needs tracks.npz)
+  ions_movie.mp4/.gif  the tracked ions moving, with short tails       (--movie)
+                       (older runs without tracks.npz: one frame per snapshot)
 
-The production run writes only 10 snapshots. For a smooth movie and tracks run a
-short dedicated movie run (about the same cost as the timing test x 7):
-    python fusor_v6.py --chamber-half-length 0.144 --t-end 1.2e-6 --t-avg 0.6e-6 \\
-        --n-macro 1e5 --n-snapshots 240 --outdir movie_run
-    python viz_v6.py movie_run --movie
+Maps: the 2D-RZ axis band (first 3 radial bins) is hatched and left out of the colour
+scale -- RZ focuses everything aimed at the centre onto the axis, overstating it.
 """
 
 import argparse
@@ -44,13 +42,14 @@ from matplotlib import animation
 from matplotlib.colors import LogNorm
 
 from fusorsim.physics import core as fp  # noqa: E402
+from fusorsim.warpx import tracks as ftracks  # noqa: E402  (pure numpy, no pywarpx)
 
 ap = argparse.ArgumentParser()
 ap.add_argument("run_dir")
-ap.add_argument("--movie", action="store_true", help="also make the ion animation and ion tracks")
-ap.add_argument("--max-frame-particles", type=int, default=40000)
-ap.add_argument("--n-tracks", type=int, default=60)
-ap.add_argument("--fps", type=int, default=12)
+ap.add_argument("--movie", action="store_true", help="also make the ion movie (from tracks.npz)")
+ap.add_argument("--max-frame-particles", type=int, default=40000, help="snapshot movie only (older runs)")
+ap.add_argument("--n-tracks", type=int, default=60, help="paths drawn in ion_tracks.png")
+ap.add_argument("--fps", type=int, default=20)
 args = ap.parse_args()
 
 run = os.path.abspath(args.run_dir)
@@ -126,17 +125,36 @@ Vcell = (np.pi * (r_e[1:] ** 2 - r_e[:-1] ** 2))[:, None] * np.diff(z_e)[None, :
 n_ion = T["ion_wdt_rz"] / max(tW, 1e-30) / Vcell
 emis = (T["fus_ion_rz"] + T["fus_neu_rz"]) / max(tW, 1e-30) / Vcell      # n / s / m^3
 xe_full = np.concatenate([-r_e[::-1], r_e[1:]]) * MM
+# 2D-RZ focuses everything aimed at the centre onto the axis, and the 1/r cell volume amplifies it, so
+# the first few radial bins are far brighter than a 3D device (see the report's core ion-ion note).
+# Colour scales come from the cells outside this band; inside it the maps saturate and are hatched.
+AXIS_R = r_e[min(3, len(r_e) - 1)]
+xc_full = 0.5 * (xe_full[1:] + xe_full[:-1])
+OFF_AXIS = np.abs(xc_full) >= AXIS_R * MM
+
+
+def off_axis_max(d):
+    v = d[OFF_AXIS]
+    v = v[np.isfinite(v) & (v > 0)]
+    return v.max() if v.size else 1.0
+
+
+def mark_axis(ax):
+    ax.axvspan(-AXIS_R * MM, AXIS_R * MM, facecolor="none", edgecolor="white", hatch="////", lw=0, alpha=0.35)
+    ax.text(AXIS_R * MM + 1.5, -H_ch * MM * 0.93, "RZ axis band: saturated, overstated in 2D", color="white",
+            fontsize=7, alpha=0.8)
 
 
 def cross_section(data, title, label, fname, cmap="inferno", floor=1e-4):
     with plt.rc_context(DARK):
         fig, ax = plt.subplots(figsize=(6.4, 6.0), constrained_layout=True)
         d = mirror(data)
-        vmax = np.nanmax(d[np.isfinite(d)]) if np.any(d > 0) else 1.0
-        im = ax.pcolormesh(xe_full, z_e * MM, np.maximum(d, vmax * floor).T, norm=LogNorm(vmax * floor, vmax),
+        vmax = off_axis_max(d)
+        im = ax.pcolormesh(xe_full, z_e * MM, np.clip(d, vmax * floor, None).T, norm=LogNorm(vmax * floor, vmax),
                            cmap=cmap, shading="flat")
         draw_electrodes(ax, "#9ecbff")
-        fig.colorbar(im, ax=ax, label=label, shrink=0.85)
+        mark_axis(ax)
+        fig.colorbar(im, ax=ax, label=label, shrink=0.85, extend="max")
         ax.set(xlabel="x (mm)", ylabel="z, symmetry axis (mm)", title=title)
         fig.savefig(os.path.join(out, fname)); plt.close(fig)
 
@@ -161,13 +179,16 @@ if tW > 0:
                                       (axs[1], n_ion, "D+ column density seen from the side",
                                        "line-integrated (m$^{-2}$)", "viridis")):
             img = L @ f
-            vmax = img.max()
-            im = ax.pcolormesh(xe_full, z_e * MM, np.maximum(img, vmax * 1e-3).T,
+            vmax = off_axis_max(img)       # chords |y| < AXIS_R cross the overstated axis cells
+            im = ax.pcolormesh(xe_full, z_e * MM, np.clip(img, vmax * 1e-3, None).T,
                                norm=LogNorm(vmax * 1e-3, vmax), cmap=cmap, shading="flat")
             draw_projected_rings(ax)
+            mark_axis(ax)
             ax.set(xlim=(-R_ch * MM, R_ch * MM), ylim=(-H_ch * MM, H_ch * MM), aspect="equal",
                    xlabel="horizontal (mm)", ylabel="z (mm)", title=ttl)
-            fig.colorbar(im, ax=ax, label=lab, shrink=0.85)
+            fig.colorbar(im, ax=ax, label=lab, shrink=0.85, extend="max")
+        fig.text(0.5, 0.01, "Horizontal bands: each 3D great-circle wire is modelled as latitude rings in 2D-RZ.",
+                 ha="center", color="#aaaaaa", fontsize=8)
         fig.savefig(os.path.join(out, "camera_view.png")); plt.close(fig)
 
 # ---------------------------------------------------------------------------
@@ -283,15 +304,117 @@ if tW > 0:
     fig.savefig(os.path.join(out, "spectra.png")); plt.close(fig)
 
 # ---------------------------------------------------------------------------
-# movie and tracks
+# ion tracks and movie. Paths come from tracks.npz (the driver follows --track-n ions every callback,
+# ~1.5 ns); snapshots are ~0.2 us apart, longer than an ion lives, so they cannot give paths.
 # ---------------------------------------------------------------------------
-if args.movie and snaps:
-    if len(snaps) < 20:
-        print(f"only {len(snaps)} snapshots: the movie will be choppy. See the docstring for a movie run.")
-    ts = None
-    tsf = os.path.join(run, "timeseries.csv")
-    if os.path.exists(tsf):
-        ts = np.genfromtxt(tsf, delimiter=",", names=True)
+def save_anim(anim, stem):
+    try:
+        anim.save(os.path.join(out, stem + ".mp4"), writer=animation.FFMpegWriter(fps=args.fps, bitrate=4000))
+        print(f"wrote {stem}.mp4")
+    except Exception as ex:
+        anim.save(os.path.join(out, stem + ".gif"), writer=animation.PillowWriter(fps=args.fps))
+        print(f"ffmpeg unavailable ({ex}); wrote {stem}.gif")
+
+
+ts = None
+tsf = os.path.join(run, "timeseries.csv")
+if os.path.exists(tsf):
+    ts = np.genfromtxt(tsf, delimiter=",", names=True)
+
+
+def run_state(t):
+    if ts is None or not len(ts):
+        return ""
+    j = np.argmin(np.abs(ts["t"] - t))
+    return f"   I = {ts['I_ema'][j]*1e3:.1f} mA   Yn = {ts['fus_ion_n_rate'][j]+ts['fus_neu_n_rate'][j]:.2e}/s"
+
+
+E_NORM = plt.Normalize(0, abs(P["V_c"]) / 1e3)          # ion energy colour scale, keV
+MERID = "along each ion's own meridional plane (mm)"
+TR = {}
+trk_file = os.path.join(run, "tracks.npz")
+if os.path.exists(trk_file):
+    Ztr = np.load(trk_file)
+    trk_t0, trk_dt = float(Ztr["t0"]), float(Ztr["dt_cb"])
+    for i, d in ftracks.split(Ztr).items():
+        if d["t"].size < 3:
+            continue
+        # an ion moves almost in one plane through the axis: project onto ITS (signed r, z) plane, which
+        # stays continuous through the centre (plain x foreshortens; |r| folds the path back on itself)
+        th0 = np.arctan2(d["y"][0], d["x"][0])
+        u = d["x"] * np.cos(th0) + d["y"] * np.sin(th0)
+        TR[i] = dict(t=d["t"], u=u * MM, z=d["z"] * MM, E=d["E"] / 1e3)
+    trk_end = max(v["t"][-1] for v in TR.values()) if TR else 0.0
+else:
+    print("no tracks.npz (run made before ion tracking was added): ion_tracks.png skipped")
+    stale = os.path.join(out, "ion_tracks.png")      # snapshot-based version: not real paths
+    if os.path.exists(stale):
+        os.remove(stale)
+
+if TR:
+    from matplotlib.collections import LineCollection
+    rng = np.random.default_rng(0)
+    keys = list(TR)
+    show = rng.choice(keys, min(args.n_tracks, len(keys)), replace=False)
+    with plt.rc_context(DARK):
+        fig, ax = plt.subplots(figsize=(6.8, 6.0), constrained_layout=True)
+        draw_electrodes(ax, "#9ecbff")
+        n_lost = 0
+        for i in show:
+            v = TR[int(i)]
+            p = np.column_stack([v["u"], v["z"]])
+            lc = LineCollection(np.stack([p[:-1], p[1:]], axis=1), cmap="plasma", norm=E_NORM, lw=0.7)
+            lc.set_array(0.5 * (v["E"][1:] + v["E"][:-1]))
+            ax.add_collection(lc)
+            if v["t"][-1] < trk_end - 1.5 * trk_dt:      # gone before the window closed
+                ax.plot(*p[-1], "x", ms=3.5, mew=0.9, color="#ff6b6b"); n_lost += 1
+            else:
+                ax.plot(*p[-1], "o", ms=2, color="white")
+        fig.colorbar(plt.cm.ScalarMappable(norm=E_NORM, cmap="plasma"), ax=ax, label="ion energy (keV)", shrink=0.85)
+        ax.set(xlabel=MERID, ylabel="z (mm)",
+               title=f"{len(show)} ion paths, {(trk_end - trk_t0)*1e9:.0f} ns (every {trk_dt*1e9:.1f} ns)")
+        ax.text(0.01, 0.01, f"o still flying at the end    x lost ({n_lost}): grid/wall hit or removed",
+                transform=ax.transAxes, fontsize=7, color="#cccccc")
+        fig.savefig(os.path.join(out, "ion_tracks.png")); plt.close(fig)
+
+if args.movie and TR:
+    from matplotlib.collections import LineCollection
+    times = np.unique(np.concatenate([v["t"] for v in TR.values()]))
+    TRAIL = 12                                            # samples of tail behind each ion (~18 ns)
+    with plt.rc_context(DARK):
+        fig, ax = plt.subplots(figsize=(6.4, 6.4))
+        fig.subplots_adjust(0.1, 0.08, 0.86, 0.94)
+        cax = fig.add_axes([0.88, 0.15, 0.025, 0.7])
+        draw_electrodes(ax, "#9ecbff")
+        tails = LineCollection([], cmap="plasma", norm=E_NORM, lw=0.9, alpha=0.8)
+        ax.add_collection(tails)
+        heads = ax.scatter([], [], s=7, c=[], cmap="plasma", norm=E_NORM, zorder=3)
+        fig.colorbar(heads, cax=cax, label="ion energy (keV)")
+        ax.set(xlabel=MERID, ylabel="z (mm)")
+        title = ax.set_title("", fontsize=9)
+
+        def track_frame(k):
+            tk = times[k]
+            segs, cols, hp, hc = [], [], [], []
+            for v in TR.values():
+                j = np.searchsorted(v["t"], tk, side="right")
+                if j == 0 or v["t"][j - 1] < tk - 0.5 * trk_dt:    # not born yet, or already gone
+                    continue
+                a = max(0, j - TRAIL)
+                p = np.column_stack([v["u"][a:j], v["z"][a:j]])
+                if len(p) > 1:
+                    segs.extend(np.stack([p[:-1], p[1:]], axis=1)); cols.extend(v["E"][a + 1:j])
+                hp.append(p[-1]); hc.append(v["E"][j - 1])
+            tails.set_segments(segs); tails.set_array(np.asarray(cols))
+            heads.set_offsets(np.asarray(hp) if hp else np.zeros((0, 2))); heads.set_array(np.asarray(hc))
+            title.set_text(f"t = {tk*1e9:6.1f} ns   {len(hp)} tracked ions{run_state(tk)}")
+            return tails, heads, title
+
+        save_anim(animation.FuncAnimation(fig, track_frame, frames=len(times), blit=False), "ions_movie")
+        plt.close(fig)
+
+elif args.movie and snaps:                       # older runs: one frame per snapshot (~0.2 us apart)
+    print(f"no tracks.npz: movie from {len(snaps)} snapshots, each a different set of ions")
     rng = np.random.default_rng(0)
     with plt.rc_context(DARK):
         fig, ax = plt.subplots(figsize=(6.4, 6.4))
@@ -311,44 +434,11 @@ if args.movie and snaps:
             x = s["r"][k] * np.cos(s["th"][k]) * MM
             sc.set_offsets(np.column_stack([x, s["z"][k] * MM]) if n else np.zeros((0, 2)))
             sc.set_array(s["E"][k] / 1e3)
-            extra = ""
-            if ts is not None and len(ts):
-                j = np.argmin(np.abs(ts["t"] - s["t"]))
-                extra = f"   I = {ts['I_ema'][j]*1e3:.1f} mA   Yn = {ts['fus_ion_n_rate'][j]+ts['fus_neu_n_rate'][j]:.2e}/s"
-            title.set_text(f"t = {s['t']*1e9:6.0f} ns   ions shown {len(k)}{extra}")
+            title.set_text(f"t = {s['t']*1e9:6.0f} ns   ions shown {len(k)}{run_state(s['t'])}")
             return sc, title
 
-        anim = animation.FuncAnimation(fig, frame, frames=len(snaps), blit=False)
-        try:
-            anim.save(os.path.join(out, "ions_movie.mp4"), writer=animation.FFMpegWriter(fps=args.fps, bitrate=4000))
-            print("wrote ions_movie.mp4")
-        except Exception as ex:
-            anim.save(os.path.join(out, "ions_movie.gif"), writer=animation.PillowWriter(fps=args.fps))
-            print(f"ffmpeg unavailable ({ex}); wrote ions_movie.gif")
+        save_anim(animation.FuncAnimation(fig, frame, frames=len(snaps), blit=False), "ions_movie")
         plt.close(fig)
-
-    # tracks: follow particle ids through consecutive snapshots
-    first = load_ions(snaps[len(snaps) // 2])
-    if first["id"].size:
-        pick = rng.choice(first["id"], min(args.n_tracks, first["id"].size), replace=False)
-        paths = {int(p): [] for p in pick}
-        for f in snaps[len(snaps) // 2:]:
-            s = load_ions(f)
-            idx = {int(v): j for j, v in enumerate(s["id"]) if int(v) in paths}
-            for p, j in idx.items():
-                paths[p].append((s["r"][j] * np.sign(np.cos(s["th"][j])), s["z"][j], s["E"][j]))
-        with plt.rc_context(DARK):
-            fig, ax = plt.subplots(figsize=(6.4, 6.0), constrained_layout=True)
-            draw_electrodes(ax, "#9ecbff")
-            for p, pts in paths.items():
-                if len(pts) < 3:
-                    continue
-                a = np.array(pts)
-                ax.plot(a[:, 0] * MM, a[:, 1] * MM, lw=0.6, alpha=0.8)
-                ax.plot(a[-1, 0] * MM, a[-1, 1] * MM, "o", ms=1.5, color="white")
-            ax.set(xlabel="x (mm)", ylabel="z (mm)",
-                   title=f"Paths of {len(paths)} ions over {len(snaps) - len(snaps) // 2} snapshots")
-            fig.savefig(os.path.join(out, "ion_tracks.png")); plt.close(fig)
 
 print(f"Images in {out}:")
 for f in sorted(os.listdir(out)):

@@ -14,7 +14,9 @@ WHAT THIS RUN PRODUCES (all written to --outdir):
                       surface impact energy spectra, cathode angular power,
                       electron impact spectra & wall positions
   run_params.json     every input and derived quantity
-  diags/              WarpX field snapshots, time-averaged phi/rho, reduced
+  tracks.npz          --track-n ions followed every callback (~1.5 ns) over the
+                      last --track-len of the run: positions and energies (viz)
+  diags/             WarpX field snapshots, time-averaged phi/rho, reduced
                       diagnostics, checkpoints (restart with --restart)
 Then run  postprocess_v6.py <outdir>  for the 15 s totals, OpenMC source
 terms, wire temperatures and certification numbers.
@@ -58,6 +60,7 @@ import numpy as np
 
 from fusorsim.physics import core as fp  # noqa: E402
 from fusorsim.warpx import mpi as fmpi  # noqa: E402
+from fusorsim.warpx import tracks as ftracks  # noqa: E402
 
 RANK, SIZE = fmpi.RANK, fmpi.SIZE
 ROOT = RANK == 0
@@ -112,6 +115,10 @@ g.add_argument("--ctrl-tau", type=float, default=0.25e-6,
 g.add_argument("--max-grid-size", type=int, default=64)
 g.add_argument("--seed", type=int, default=20261007)
 g.add_argument("--n-snapshots", type=int, default=20)
+g.add_argument("--track-n", type=int, default=200, help="ions followed every callback for tracks.npz (0 = off)")
+g.add_argument("--track-len", type=float, default=300e-9, help="tracking window length, s")
+g.add_argument("--track-start", type=float, default=None,
+               help="tracking window start, s (default: the last --track-len of the run, not before --t-avg)")
 g.add_argument("--checkpoint-every", type=float, default=1e-6, help="checkpoint interval, s")
 g = ap.add_argument_group("run control")
 g.add_argument("--outdir", default=None)
@@ -307,6 +314,8 @@ print(f"  max CX probability per callback interval: {p_cx_max:.3f} (must be << 1
 assert p_cx_max < 0.1, "reduce --ncb"
 print("=" * 78)
 
+trk_t0 = args.track_start if args.track_start is not None else max(args.t_avg, args.t_end - args.track_len)
+params.update(track_n=args.track_n, track_t0=trk_t0, track_t1=trk_t0 + args.track_len)
 params.update(nranks=SIZE, omp_threads=os.environ.get("OMP_NUM_THREADS"),
               fusorsim_git=os.environ.get("FUSORSIM_GIT"), sif_digest=os.environ.get("FUSORSIM_SIF_SHA256"))
 if ROOT:
@@ -428,6 +437,10 @@ H = dict(
 )
 state = dict(alpha=1.0, alpha_I=1.0, I_ema=0.0, t_last=0.0, ncall=0)
 pending = dict(P=np.zeros((0, 3)), D=np.zeros((0, 3)), E=np.zeros(0), w=np.zeros(0))
+# ion tracks: own RNG stream, so turning tracking on/off leaves the physics draws unchanged
+trk = ftracks.Recorder()
+trk_rng = np.random.default_rng([args.seed, 77, RANK])
+TRK = dict(picked=False, saved=False)
 ts_rows = []
 TS_COLS = None
 
@@ -830,6 +843,30 @@ def save_state(step=None):
              th_edges=th_edges, wz_edges=wz_edges, wr_edges=wr_edges, **out)
 
 
+def pick_tracked_ions():
+    """Choose --track-n ions, each rank in proportion to the ions it holds, and give every rank the
+    whole id list (an ion may move to another rank's boxes). Collective: called by every rank at the
+    same callback (the window test uses t, which is identical on all ranks)."""
+    ids = concat([a["idcpu"][a["w"] > 0] for a in ion_tiles()]).astype(np.uint64)
+    n_all = max(sum(fmpi.allgather(ids.size)), 1)
+    k = min(ids.size, int(round(args.track_n * ids.size / n_all)))
+    mine = trk_rng.choice(ids, k, replace=False) if k else ids[:0]
+    trk.set_ids(np.concatenate(fmpi.allgather(mine)))
+    TRK["picked"] = True
+
+
+def save_tracks():
+    """Gather every rank's track rows to rank 0 -> tracks.npz. Collective."""
+    parts = fmpi.gather(trk.rows())
+    TRK["saved"] = True
+    if ROOT:
+        d = ftracks.merge(parts)
+        if d["t"].size:
+            np.savez(os.path.join(outdir, "tracks.npz"), **d, t0=trk_t0, t1=trk_t0 + args.track_len,
+                     dt_cb=dt_cb, n_picked=trk.ids.size)
+        print(f"[v6] tracks: {trk.ids.size} ions, {d['t'].size} samples -> tracks.npz", flush=True)
+
+
 # =============================================================================
 # The callback
 # =============================================================================
@@ -912,6 +949,9 @@ def physics_callback():
     buf.clear_buffer()
 
     # ---- 2. live ions: fusion (expected value), CX and ionisation (MC) ------
+    tracking = args.track_n > 0 and trk_t0 <= t <= trk_t0 + args.track_len
+    if tracking and not TRK["picked"]:
+        pick_tracked_ions()                          # collective, once
     new_neutrals = []
     for a in ion_tiles():
         npart = a["w"].size
@@ -929,6 +969,8 @@ def physics_callback():
         acc["fus_ion_n"] += Rn.sum()
         acc["fus_ion_p"] += np.sum(w * n_gas * Kp * Dt)
         r, z = a["r"], a["z"]
+        if tracking:                                 # before CX below changes velocities
+            trk.record(t, a["idcpu"], r * np.cos(a["theta"]), r * np.sin(a["theta"]), z, E)
         if in_window:
             H["fus_ion_rz"] += np.histogram2d(r, z, [r_edges, z_edges], weights=Rn)[0]
             H["fus_ion_E"] += np.histogram(E, E_edges, weights=Rn)[0]
@@ -1032,6 +1074,8 @@ def physics_callback():
         ok = valid_birth_positions(X)
         n_inj += inject(X[ok], U[ok], W[ok])
     flush_injections()   # collective: every rank, every callback
+    if TRK["picked"] and not TRK["saved"] and t > trk_t0 + args.track_len:
+        save_tracks()    # collective, once: written at the window's end so a later crash keeps them
 
     # ---- 4b. MPI: one global picture of this interval. Everything below (controller,
     #      timeseries) is computed from identical reduced numbers on every rank, so
@@ -1102,4 +1146,6 @@ remaining = max_steps - (sim.extension.warpx.getistep(0) if args.restart else 0)
 sim.step(remaining)
 flush_timeseries()
 save_state()
+if args.track_n > 0 and not TRK["saved"]:     # window ran to t_end (same on every rank: collective)
+    save_tracks()
 if ROOT: print(f"[v6] done in {(time.time()-t_wall0)/3600:.2f} h. Next: fusor-post {outdir}")
