@@ -3,7 +3,9 @@ From: sif/analysis.sif
 
 # Visualisation component: the analysis image plus ffmpeg for the ion movie.
 %post
-    dnf -y install epel-release && dnf -y install ffmpeg-free && dnf clean all
+    # EPEL's ffmpeg-free needs ladspa (via rubberband), which is in CRB
+    dnf -y install epel-release dnf-plugins-core && dnf config-manager --set-enabled crb
+    dnf -y install ffmpeg-free && dnf clean all
 
 %environment
     export MPLBACKEND=Agg

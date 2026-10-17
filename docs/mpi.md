@@ -42,7 +42,7 @@ The image uses OpenMPI's *internal* PMIx; if the host `srun` speaks a different 
 
 * Done and verified: serial path through the package; `--case`; unit tests; `mpi-base` (OpenMPI 4.1.6),
   `warpx` and `analysis` images built in WSL; serial `coarse_test` run in the warpx image.
-* Written, **not built or run**: `openmc`, `viz`, `ansys` `.def` files; Slurm scripts.
+* Written, **not built or run**: `openmc`, `ansys` `.def` files; Slurm scripts. (`viz` built and run in WSL.)
 * MPI in WSL (2026-10-17, `hpc/wsl/run.sh`, 2/4/8 ranks on `coarse_test`): one `timeseries.csv` header,
   monotonic steps, end state (n_macro, current, neutron rates) equal to the 1-rank run within Monte Carlo noise.
   Two bugs found on the way, both fixed:

@@ -40,6 +40,7 @@ containers/build.sh analysis
 RANKS=2 THREADS=4 hpc/wsl/run.sh R1_bound_5mT  # detached; -> runs/R1_bound_5mT_<time>/ + .log + .pid
 fusor-monitor --runs runs                      # live progress page: http://localhost:8050 (stdlib only)
 apptainer run sif/analysis.sif runs/<run>     # -> runs/<run>/post/report.md
+apptainer run sif/viz.sif runs/<run> --movie  # -> runs/<run>/viz/*.png + ions_movie.mp4
 LIVE_SRC=1 hpc/wsl/run.sh coarse_test          # dev: run ./src against the image's frozen dependencies
 ```
 
@@ -67,9 +68,9 @@ seed and all derived inputs. Results are reproducible for a fixed (seed, number 
 
 ## Status
 
-Verified: package imports, physics self-test, preflight via `--case`, unit tests; `mpi-base`, `warpx` and
-`analysis` images built in WSL (2026-10-17); serial `coarse_test` run in the warpx image (1 rank x 16 threads,
-263 s) and post-processed in the analysis image.
+Verified: package imports, physics self-test, preflight via `--case`, unit tests; `mpi-base`, `warpx`,
+`analysis` and `viz` images built in WSL (2026-10-17); serial `coarse_test` run in the warpx image (1 rank x 16
+threads, 263 s), post-processed in the analysis image, rendered (incl. `--movie`) in the viz image.
 MPI in WSL: `coarse_test` with 2, 4 and 8 ranks agrees with 1 rank within Monte Carlo noise.
-**Not yet verified:** `openmc`, `viz`, `ansys` image builds, multi-node MPI, M3 launch.
+**Not yet verified:** `openmc`, `ansys` image builds, multi-node MPI, M3 launch.
 See [docs/mpi.md](docs/mpi.md#status).
