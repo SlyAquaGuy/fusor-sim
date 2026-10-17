@@ -1,0 +1,36 @@
+Bootstrap: docker
+From: rockylinux:9
+
+# Base for the MPI components (warpx, openmc). Hybrid model: the OpenMPI *inside* the image
+# launches under the host's srun/PMIx, so OMPI_VERSION must be ABI-compatible with the M3 module.
+# CHECK ON M3 FIRST:  module avail openmpi ; ompi_info | grep -E "Open MPI:|pmix|ucx" ; srun --mpi=list
+# then override:      apptainer build --build-arg OMPI_VERSION=x.y.z mpi-base.sif mpi-base.def
+
+%arguments
+    OMPI_VERSION=4.1.6
+    PYTHON=3.11
+
+%post
+    dnf -y install epel-release dnf-plugins-core && dnf config-manager --set-enabled crb
+    dnf -y install gcc gcc-c++ gfortran make cmake git wget which patch bzip2 xz \
+        libevent-devel hwloc-devel ucx-devel rdma-core-devel zlib-devel openssl-devel \
+        python{{ PYTHON }} python{{ PYTHON }}-devel python{{ PYTHON }}-pip
+    alternatives --set python3 /usr/bin/python{{ PYTHON }} || true
+    cd /tmp
+    V={{ OMPI_VERSION }}; MM=${V%.*}
+    wget -q https://download.open-mpi.org/release/open-mpi/v${MM}/openmpi-${V}.tar.bz2
+    tar xf openmpi-${V}.tar.bz2 && cd openmpi-${V}
+    ./configure --prefix=/opt/mpi --with-ucx --with-pmix=internal --with-libevent --with-hwloc \
+                --enable-mpi1-compatibility
+    make -j"$(nproc)" install
+    cd / && rm -rf /tmp/openmpi-*
+    /opt/mpi/bin/ompi_info | grep -E "Open MPI:|MCA pmix|MCA pml" > /opt/mpi/BUILD_INFO
+    python3 -m pip install --no-cache-dir -U pip wheel setuptools
+
+%environment
+    export PATH=/opt/mpi/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/mpi/lib:$LD_LIBRARY_PATH
+
+%labels
+    Component mpi-base
+    OMPI_VERSION {{ OMPI_VERSION }}

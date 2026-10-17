@@ -1,0 +1,12 @@
+# Certification bounding case (defaults of the driver, written out so the run is self-describing).
+name: R1_bound_5mT
+description: 60 kV, 50 mA, 5 mTorr D2, gamma=1, reflection on, makeup ions at the anode
+voltage: -60000
+current: 0.05
+pressure: 5.0
+gamma: 1.0
+reflection: "on"
+makeup: anode
+chamber_half_length: 0.144    # CONFIRM the real half-length
+t_end: 4.0e-6
+t_avg: 2.0e-6

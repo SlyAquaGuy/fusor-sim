@@ -1,0 +1,7 @@
+# Versions from the working conda env `warpx` (2026-10-17). Freeze to hashes after the first
+# successful build:  pip-compile --generate-hashes
+numpy==2.4.6
+scipy==1.17.1
+matplotlib==3.11.1
+yt==4.4.2
+pyyaml==6.0.2

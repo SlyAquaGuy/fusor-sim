@@ -1,0 +1,53 @@
+Bootstrap: localimage
+From: sif/mpi-base.sif
+
+# OpenMC 0.16.0 (CSG only -- the fusor model does not use DAGMC), MPI + OpenMP, parallel HDF5.
+# Nuclear data is NOT in the image: bind-mount it and set OPENMC_CROSS_SECTIONS.
+%arguments
+    OPENMC_REF=v0.16.0
+    HDF5_VERSION=1.14.4.3
+    FUSORSIM_GIT=unknown
+
+%files
+    pyproject.toml /opt/fusor-sim/pyproject.toml
+    README.md /opt/fusor-sim/README.md
+    LICENSE /opt/fusor-sim/LICENSE
+    src /opt/fusor-sim/src
+    data /opt/fusor-sim/data
+    containers/lock/openmc.txt /opt/lock.txt
+
+%post
+    export PATH=/opt/mpi/bin:$PATH LD_LIBRARY_PATH=/opt/mpi/lib:$LD_LIBRARY_PATH
+    cd /tmp
+    V={{ HDF5_VERSION }}; MM=${V%.*}
+    wget -q https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-${MM}/hdf5-${V}/src/hdf5-${V}.tar.gz
+    tar xf hdf5-${V}.tar.gz && cd hdf5-${V}
+    CC=mpicc ./configure --prefix=/opt/hdf5 --enable-parallel --enable-shared
+    make -j"$(nproc)" install && cd / && rm -rf /tmp/hdf5-*
+    export HDF5_ROOT=/opt/hdf5 HDF5_MPI=ON HDF5_DIR=/opt/hdf5
+    cd /opt && git clone --depth 1 --branch {{ OPENMC_REF }} --recurse-submodules https://github.com/openmc-dev/openmc.git openmc-src
+    cd openmc-src
+    cmake -S . -B build -DOPENMC_USE_MPI=ON -DOPENMC_USE_OPENMP=ON -DHDF5_PREFER_PARALLEL=ON \
+          -DCMAKE_INSTALL_PREFIX=/opt/openmc -DCMAKE_BUILD_TYPE=Release
+    cmake --build build -j"$(nproc)" --target install
+    CC=mpicc python3 -m pip install --no-cache-dir -r /opt/lock.txt
+    python3 -m pip install --no-cache-dir --no-deps /opt/openmc-src
+    cd / && rm -rf /opt/openmc-src
+    python3 -m pip install --no-cache-dir --no-deps /opt/fusor-sim
+
+%environment
+    export PATH=/opt/openmc/bin:/opt/mpi/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/openmc/lib64:/opt/openmc/lib:/opt/hdf5/lib:/opt/mpi/lib:$LD_LIBRARY_PATH
+    export FUSORSIM_DATA=/opt/fusor-sim/data
+    export FUSORSIM_GIT={{ FUSORSIM_GIT }}
+    export OPENMC_CROSS_SECTIONS=${OPENMC_CROSS_SECTIONS:-/nucdata/endfb-viii.0-hdf5/cross_sections.xml}
+
+%runscript
+    exec fusor-openmc "$@"
+
+%test
+    python3 -c "import openmc, fusorsim; print('openmc', openmc.__version__)"
+
+%labels
+    Component openmc
+    OpenMC {{ OPENMC_REF }}

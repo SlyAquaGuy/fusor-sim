@@ -1,0 +1,45 @@
+Bootstrap: localimage
+From: sif/mpi-base.sif
+
+# WarpX 26.01, 2D-RZ, MPI + OpenMP, double precision (as the conda build used so far, plus MPI).
+# Build from the repo root (%files paths are relative to it):  containers/build.sh warpx
+%arguments
+    WARPX_REF=26.01
+    FUSORSIM_GIT=unknown
+
+%files
+    pyproject.toml /opt/fusor-sim/pyproject.toml
+    README.md /opt/fusor-sim/README.md
+    LICENSE /opt/fusor-sim/LICENSE
+    src /opt/fusor-sim/src
+    data /opt/fusor-sim/data
+    containers/lock/warpx.txt /opt/lock.txt
+
+%post
+    export PATH=/opt/mpi/bin:$PATH LD_LIBRARY_PATH=/opt/mpi/lib:$LD_LIBRARY_PATH
+    MPICC=/opt/mpi/bin/mpicc python3 -m pip install --no-cache-dir -r /opt/lock.txt
+    cd /opt && git clone --depth 1 --branch {{ WARPX_REF }} https://github.com/BLAST-WarpX/warpx.git
+    cd warpx
+    cmake -S . -B build -DWarpX_DIMS=RZ -DWarpX_MPI=ON -DWarpX_COMPUTE=OMP -DWarpX_PYTHON=ON \
+          -DWarpX_PRECISION=DOUBLE -DWarpX_PARTICLE_PRECISION=DOUBLE -DWarpX_OPENPMD=OFF \
+          -DWarpX_APP=OFF -DCMAKE_BUILD_TYPE=Release
+    cmake --build build -j"$(nproc)" --target pip_install
+    cd / && rm -rf /opt/warpx
+    python3 -m pip install --no-cache-dir --no-deps /opt/fusor-sim
+
+%environment
+    export PATH=/opt/mpi/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/mpi/lib:$LD_LIBRARY_PATH
+    export FUSORSIM_DATA=/opt/fusor-sim/data
+    export FUSORSIM_GIT={{ FUSORSIM_GIT }}
+    export OMP_PROC_BIND=spread OMP_PLACES=threads
+
+%runscript
+    exec fusor-warpx "$@"
+
+%test
+    python3 -c "import pywarpx, mpi4py, fusorsim; print('warpx image ok')"
+
+%labels
+    Component warpx
+    WarpX {{ WARPX_REF }}

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fusorsim"
+version = "0.1.0"
+description = "Source terms and dose model for the Monash IEC fusor: WarpX PIC -> analysis -> OpenMC / ANSYS"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = ["numpy>=2.0", "scipy>=1.13", "pyyaml>=6"]
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.8", "yt>=4.4"]
+mpi = ["mpi4py>=3.1"]
+test = ["pytest>=8"]
+
+[project.scripts]
+fusor-warpx = "fusorsim.cli:warpx"
+fusor-post = "fusorsim.cli:post"
+fusor-openmc = "fusorsim.cli:openmc"
+fusor-viz = "fusorsim.cli:viz"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["warpx: needs the WarpX container", "mpi: needs mpirun"]

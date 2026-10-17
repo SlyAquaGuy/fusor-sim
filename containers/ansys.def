@@ -1,0 +1,36 @@
+Bootstrap: docker
+From: rockylinux:9
+
+# ANSYS component: Python pre/post only. NO ANSYS binaries here (licence): the solver is the host
+# module `ansys/25r1` on M3 (see hpc/m3/ansys.slurm). This image builds its inputs (APDL / CSV heat
+# loads from the analysis step) and reads results.
+%arguments
+    PYTHON=3.11
+    FUSORSIM_GIT=unknown
+
+%files
+    pyproject.toml /opt/fusor-sim/pyproject.toml
+    README.md /opt/fusor-sim/README.md
+    LICENSE /opt/fusor-sim/LICENSE
+    src /opt/fusor-sim/src
+    data /opt/fusor-sim/data
+    containers/lock/ansys.txt /opt/lock.txt
+
+%post
+    dnf -y install python{{ PYTHON }} python{{ PYTHON }}-pip && dnf clean all
+    alternatives --set python3 /usr/bin/python{{ PYTHON }} || true
+    python3 -m pip install --no-cache-dir -r /opt/lock.txt
+    python3 -m pip install --no-cache-dir --no-deps /opt/fusor-sim
+
+%environment
+    export FUSORSIM_DATA=/opt/fusor-sim/data
+    export FUSORSIM_GIT={{ FUSORSIM_GIT }}
+
+%runscript
+    exec python3 -m fusorsim.ansys "$@"
+
+%test
+    python3 -c "import numpy, scipy, fusorsim; print('ansys image ok')"
+
+%labels
+    Component ansys

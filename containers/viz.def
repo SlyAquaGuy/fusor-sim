@@ -1,0 +1,18 @@
+Bootstrap: localimage
+From: sif/analysis.sif
+
+# Visualisation component: the analysis image plus ffmpeg for the ion movie.
+%post
+    dnf -y install epel-release && dnf -y install ffmpeg-free && dnf clean all
+
+%environment
+    export MPLBACKEND=Agg
+
+%runscript
+    exec fusor-viz "$@"
+
+%test
+    ffmpeg -version | head -1
+
+%labels
+    Component viz

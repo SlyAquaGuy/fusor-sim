@@ -1,0 +1,35 @@
+Bootstrap: docker
+From: rockylinux:9
+
+# Analysis component: pure Python (no MPI). Versions pinned in lock/analysis.txt.
+%arguments
+    PYTHON=3.11
+    FUSORSIM_GIT=unknown
+
+%files
+    pyproject.toml /opt/fusor-sim/pyproject.toml
+    README.md /opt/fusor-sim/README.md
+    LICENSE /opt/fusor-sim/LICENSE
+    src /opt/fusor-sim/src
+    data /opt/fusor-sim/data
+    containers/lock/analysis.txt /opt/lock.txt
+
+%post
+    dnf -y install python{{ PYTHON }} python{{ PYTHON }}-pip && dnf clean all
+    alternatives --set python3 /usr/bin/python{{ PYTHON }} || true
+    python3 -m pip install --no-cache-dir -r /opt/lock.txt
+    python3 -m pip install --no-cache-dir --no-deps /opt/fusor-sim
+
+%environment
+    export FUSORSIM_DATA=/opt/fusor-sim/data
+    export FUSORSIM_GIT={{ FUSORSIM_GIT }}
+    export MPLBACKEND=Agg
+
+%runscript
+    exec fusor-post "$@"
+
+%test
+    python3 -c "import numpy, scipy, matplotlib, yt, fusorsim; print('analysis image ok')"
+
+%labels
+    Component analysis

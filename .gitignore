@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- fusor-sim ---------------------------------------------------------------
+# results and large artefacts never go in git (see docs/): runs live on /scratch
+runs/
+diags/
+*.sif
+*.npz
+*.log
+python_state_*.npz
+phi_vacuum.npy
+# keep the small reference figures and the data tables
+!examples/*.png
+!examples/*.mp4
+!data/*.dat
+*:Zone.Identifier

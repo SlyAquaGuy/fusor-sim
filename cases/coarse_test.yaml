@@ -1,0 +1,5 @@
+name: coarse_test
+description: Short run to check the toolchain (matches the old timing_test)
+chamber_half_length: 0.144
+t_end: 0.2e-6
+t_avg: 0.1e-6

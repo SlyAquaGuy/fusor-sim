@@ -1,0 +1,7 @@
+# pywarpx itself is built from source in warpx.def (pip_install target), not listed here.
+numpy==2.4.6
+scipy==1.17.1
+pyyaml==6.0.2
+# no exact pin yet: freeze after the first successful build (must be built against the in-image OpenMPI)
+mpi4py>=4.0,<5
+# openPMD-api is OFF in the build; yt reads the plotfiles written by --diags
