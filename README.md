@@ -76,5 +76,7 @@ MPI in WSL: `coarse_test` with 2, 4 and 8 ranks agrees with 1 rank within Monte 
 an axisymmetric grid); calibrated (`data/grid_kicks_3d.dat`, 800 ions, 3957 crossings) and A/B-tested on R1
 (2026-10-18, 2 ranks): axis emission fraction 8.7 → 5.5 % (coarse test), peak neutron rate −0.3 %, hottest
 cathode latitude 935 → 778 K. R1 keeps `off` as the bound; `cases/R2_best_5mT.yaml` is the best estimate.
+Planned, not started: CAD-driven ANSYS Maxwell field stage for the grid kicks, plus arcing diagnostics
+([docs/maxwell-plan.md](docs/maxwell-plan.md)).
 **Not yet verified:** `openmc`, `ansys` image builds, multi-node MPI, M3 launch.
 See [docs/mpi.md](docs/mpi.md#status).
