@@ -119,6 +119,9 @@ g.add_argument("--ctrl-tau", type=float, default=0.25e-6,
 g.add_argument("--max-grid-size", type=int, default=64)
 g.add_argument("--seed", type=int, default=20261007)
 g.add_argument("--n-snapshots", type=int, default=20)
+g.add_argument("--movie-frames", type=int, default=1300,
+               help="frames of EVERY ion (position + energy) evenly over the whole run -> diags/movie/ "
+                    "(5 bytes per ion per frame, ~2 GB for R1; 0 = off)")
 g.add_argument("--track-n", type=int, default=200, help="ions followed every callback for tracks.npz (0 = off)")
 g.add_argument("--track-len", type=float, default=300e-9, help="tracking window length, s")
 g.add_argument("--track-start", type=float, default=None,
@@ -338,7 +341,8 @@ params.update(grid_kicks=args.grid_kicks, grid_kicks_table=KICKS["path"] if KICK
 print("=" * 78)
 
 trk_t0 =args.track_start if args.track_start is not None else max(args.t_avg, args.t_end - args.track_len)
-params.update(track_n=args.track_n, track_t0=trk_t0, track_t1=trk_t0 + args.track_len)
+params.update(track_n=args.track_n, track_t0=trk_t0, track_t1=trk_t0 + args.track_len,
+              movie_frames=args.movie_frames)
 params.update(nranks=SIZE, omp_threads=os.environ.get("OMP_NUM_THREADS"),
               fusorsim_git=os.environ.get("FUSORSIM_GIT"), sif_digest=os.environ.get("FUSORSIM_SIF_SHA256"))
 if ROOT:
@@ -464,6 +468,14 @@ pending = dict(P=np.zeros((0, 3)), D=np.zeros((0, 3)), E=np.zeros(0), w=np.zeros
 trk = ftracks.Recorder()
 trk_rng = np.random.default_rng([args.seed, 77, RANK])
 TRK = dict(picked=False, saved=False)
+# movie: every --movie-frames'th callback, every ion's side-view position (x = r cos(theta), z) and energy,
+# packed to 5 bytes (uint16 x, z: 4 um steps over the chamber; uint8 E: 0.35 keV steps to 1.5 e|V_c|)
+MOV = None
+if args.movie_frames > 0:
+    MOV = dict(n=0, every=max(1, int(round(max_steps / args.ncb / args.movie_frames))),
+               E_top=1.5 * V_abs, dir=os.path.join(outdir, "diags", "movie"))
+    if ROOT:
+        os.makedirs(MOV["dir"], exist_ok=True)
 ts_rows = []
 TS_COLS = None
 
@@ -866,6 +878,18 @@ def save_state(step=None):
              th_edges=th_edges, wz_edges=wz_edges, wr_edges=wr_edges, **out)
 
 
+def write_movie_frame(t, step, parts):
+    """Gather every rank's packed ions to rank 0 -> diags/movie/frame_<step>.npz. Collective."""
+    x = np.concatenate([p[0] for p in parts]) if parts else np.zeros(0, np.uint16)
+    z = np.concatenate([p[1] for p in parts]) if parts else np.zeros(0, np.uint16)
+    e = np.concatenate([p[2] for p in parts]) if parts else np.zeros(0, np.uint8)
+    allp = fmpi.gather((x, z, e))
+    if ROOT:
+        np.savez(os.path.join(MOV["dir"], f"frame_{step:08d}.npz"), t=t, step=step,
+                 x=np.concatenate([p[0] for p in allp]), z=np.concatenate([p[1] for p in allp]),
+                 E=np.concatenate([p[2] for p in allp]), R_ch=R_ch, H_ch=H_ch, E_top_eV=MOV["E_top"])
+
+
 def pick_tracked_ions():
     """Choose --track-n ions, each rank in proportion to the ions it holds, and give every rank the
     whole id list (an ion may move to another rank's boxes). Collective: called by every rank at the
@@ -976,6 +1000,8 @@ def physics_callback():
     if tracking and not TRK["picked"]:
         pick_tracked_ions()                          # collective, once
     new_neutrals = []
+    movie_now = MOV is not None and (MOV["n"] + 1) % MOV["every"] == 0   # same on every rank
+    mov_parts = []
     for a in ion_tiles():
         npart = a["w"].size
         if npart == 0:
@@ -1006,6 +1032,11 @@ def physics_callback():
                 ux[kx], uy[kx], uz[kx] = fp.apply_azimuthal_kick(ux[kx], uy[kx], uz[kx], th_[kx], r[kx], dl)
                 acc["grid_kick"] += w[kx].sum()
                 acc["grid_kick_absdlz"] += np.sum(w[kx] * np.abs(dl))
+        if movie_now:                                # side view: x = r cos(theta) projects the 3D ring
+            q = 65535.0
+            mov_parts.append((np.clip((r * np.cos(a["theta"]) + R_ch) / (2 * R_ch) * q, 0, q).astype(np.uint16),
+                              np.clip((z + H_ch) / (2 * H_ch) * q, 0, q).astype(np.uint16),
+                              np.clip(E / MOV["E_top"] * 255, 0, 255).astype(np.uint8)))
         if in_window:
             H["fus_ion_rz"] += np.histogram2d(r, z, [r_edges, z_edges], weights=Rn)[0]
             H["fus_ion_E"] += np.histogram(E, E_edges, weights=Rn)[0]
@@ -1036,6 +1067,11 @@ def physics_callback():
                 deliver_interior(X[ins_idx], w[ins_idx].copy(), acc)
                 a["w"][ins_idx] = 0.0
                 a["idcpu"][ins_idx] &= np.uint64(0x7FFFFFFFFFFFFFFF)   # AMReX invalid flag -> removed
+
+    if MOV is not None:
+        MOV["n"] += 1                                # same count on every rank -> collective write is safe
+        if movie_now:
+            write_movie_frame(t, step, mov_parts)
 
     # ---- 3. neutral transport: new CX neutrals + queued reflections ----------
     if new_neutrals or len(pending["w"]):

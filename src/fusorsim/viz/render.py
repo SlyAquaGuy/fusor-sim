@@ -21,8 +21,10 @@ Writes into <run_dir>/viz/:
                        and the neutron spectrum
   ion_tracks.png       paths of --n-tracks ions, sampled every callback (~1.5 ns),
                        coloured by energy; x = ion lost (needs tracks.npz)
-  ions_movie.mp4/.gif  the tracked ions moving, with short tails       (--movie)
-                       (older runs without tracks.npz: one frame per snapshot)
+  ions_movie.mp4       every ion as a dot coloured by energy, side view, over the whole run,
+                       1080x1080, from the driver's diags/movie/ frames         (--movie)
+  ion_tracks_movie.mp4 the tracked ions moving, with short tails                (--movie)
+                       (older runs with neither: ions_movie from the ~20 snapshots)
 
 Maps: the 2D-RZ axis band (first 3 radial bins) is hatched and left out of the colour
 scale -- RZ focuses everything aimed at the centre onto the axis, overstating it.
@@ -49,7 +51,7 @@ ap.add_argument("run_dir")
 ap.add_argument("--movie", action="store_true", help="also make the ion movie (from tracks.npz)")
 ap.add_argument("--max-frame-particles", type=int, default=40000, help="snapshot movie only (older runs)")
 ap.add_argument("--n-tracks", type=int, default=60, help="paths drawn in ion_tracks.png")
-ap.add_argument("--fps", type=int, default=20)
+ap.add_argument("--fps", type=int, default=30)
 args = ap.parse_args()
 
 run = os.path.abspath(args.run_dir)
@@ -309,7 +311,7 @@ if tW > 0:
 # ---------------------------------------------------------------------------
 def save_anim(anim, stem):
     try:
-        anim.save(os.path.join(out, stem + ".mp4"), writer=animation.FFMpegWriter(fps=args.fps, bitrate=4000))
+        anim.save(os.path.join(out, stem + ".mp4"), writer=animation.FFMpegWriter(fps=args.fps, bitrate=16000))
         print(f"wrote {stem}.mp4")
     except Exception as ex:
         anim.save(os.path.join(out, stem + ".gif"), writer=animation.PillowWriter(fps=args.fps))
@@ -410,10 +412,11 @@ if args.movie and TR:
             title.set_text(f"t = {tk*1e9:6.1f} ns   {len(hp)} tracked ions{run_state(tk)}")
             return tails, heads, title
 
-        save_anim(animation.FuncAnimation(fig, track_frame, frames=len(times), blit=False), "ions_movie")
+        save_anim(animation.FuncAnimation(fig, track_frame, frames=len(times), blit=False), "ion_tracks_movie")
         plt.close(fig)
 
-elif args.movie and snaps:                       # older runs: one frame per snapshot (~0.2 us apart)
+MFR = sorted(glob.glob(os.path.join(diags, "movie", "frame_*.npz")))
+if args.movie and not MFR and snaps:             # older runs: one frame per snapshot (~0.2 us apart)
     print(f"no tracks.npz: movie from {len(snaps)} snapshots, each a different set of ions")
     rng = np.random.default_rng(0)
     with plt.rc_context(DARK):
@@ -438,6 +441,51 @@ elif args.movie and snaps:                       # older runs: one frame per sna
             return sc, title
 
         save_anim(animation.FuncAnimation(fig, frame, frames=len(snaps), blit=False), "ions_movie")
+        plt.close(fig)
+
+# ---------------------------------------------------------------------------
+# full-run movie: every ion, every frame (diags/movie/, binned by the driver each callback). Side view
+# like a camera: brightness = ion density (log), colour = mean ion energy.
+# ---------------------------------------------------------------------------
+if args.movie and MFR:
+    E_kev_max = abs(P["V_c"]) / 1e3                               # colour scale 0..e|V_c| (as before)
+    LUT = (plt.get_cmap("plasma")(np.linspace(0, 1, 256))[:, :3] * 255).astype(np.uint8)
+    with plt.rc_context(DARK):
+        fig = plt.figure(figsize=(7.2, 7.2), dpi=150)             # 1080 x 1080 px
+        ax = fig.add_axes([0.10, 0.07, 0.74, 0.86])
+        cax = fig.add_axes([0.87, 0.15, 0.025, 0.7])
+        fig.colorbar(plt.cm.ScalarMappable(plt.Normalize(0, E_kev_max), "plasma"), cax=cax, label="ion energy (keV)")
+        ax.set(xlim=(-R_ch * MM, R_ch * MM), ylim=(-H_ch * MM, H_ch * MM), aspect="equal",
+               xlabel="x (mm)", ylabel="z (mm)")
+        fig.canvas.draw()
+        W, Hpx = int(round(ax.bbox.width)), int(round(ax.bbox.height))   # raster = the axes' own pixels
+        im = ax.imshow(np.zeros((Hpx, W, 3), np.uint8), extent=(-R_ch * MM, R_ch * MM, -H_ch * MM, H_ch * MM),
+                       origin="lower", interpolation="nearest", zorder=1)
+        draw_projected_rings(ax)
+        ax.set(xlim=(-R_ch * MM, R_ch * MM), ylim=(-H_ch * MM, H_ch * MM))
+        title = ax.set_title("", fontsize=10)
+
+        def raster(F):
+            """Every ion as a 2x2-pixel dot coloured by energy; hotter ions drawn last (on top)."""
+            img = np.zeros((Hpx, W, 3), np.uint8)
+            e = F["E"]
+            o = np.argsort(e, kind="stable")
+            ix = (F["x"][o].astype(np.int64) * (W - 1)) // 65535
+            iz = (F["z"][o].astype(np.int64) * (Hpx - 1)) // 65535
+            ci = np.minimum(e[o].astype(np.int64) * float(F["E_top_eV"]) / 1e3 / E_kev_max, 255).astype(np.int64)
+            col = LUT[ci]
+            for dx_, dz_ in ((0, 0), (1, 0), (0, 1), (1, 1)):
+                img[np.minimum(iz + dz_, Hpx - 1), np.minimum(ix + dx_, W - 1)] = col
+            return img
+
+        def full_frame(i):
+            F = np.load(MFR[i])
+            im.set_data(raster(F))
+            tt = float(F["t"])
+            title.set_text(f"t = {tt*1e9:6.0f} ns   ions shown {F['E'].size}{run_state(tt)}")
+            return im, title
+
+        save_anim(animation.FuncAnimation(fig, full_frame, frames=len(MFR), blit=False), "ions_movie")
         plt.close(fig)
 
 print(f"Images in {out}:")
