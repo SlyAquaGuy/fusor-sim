@@ -29,7 +29,9 @@ Monash M3 (production, Slurm + MPI). The layout is in [README.md](README.md); th
   adds the l_z change the real 3D wire grid gives at each cathode crossing, sampled from
   `data/grid_kicks_3d.dat` (made by `python -m fusorsim.physics.grid3d --case <case>`). The table is
   geometry-specific: regenerate it after changing radii, wires, `--great-circles`, voltage or chamber size
-  (the driver refuses a mismatch).
+  (the driver refuses a mismatch). Kicks lower the bounding outputs slightly (A/B 2026-10-18: peak neutrons
+  −0.3 %, hottest cathode latitude 935 → 778 K), so **R1 (`R1_bound_5mT`, kicks off) is the certification
+  bound** and **R2 (`R2_best_5mT`, kicks on) is the best estimate** (source shape, pictures).
 - Keep the verified conventions:
   - WarpX implicit function: >0 inside solid, <0 in vacuum. The inverted sign fills the cathode.
   - `--nr` must be a multiple of 8 (AMReX blocking factor).
@@ -64,6 +66,11 @@ Monash M3 (production, Slurm + MPI). The layout is in [README.md](README.md); th
 - Never reuse an `--outdir`. Old diags must never mix with new ones; the driver refuses, so use `--restart`.
 - Every run writes `run_params.json` (git describe, image SHA-256, ranks/threads, seed, derived inputs).
   Anything new that affects results must be recorded there too.
+- Run outputs besides the tallies: `tracks.npz` (`--track-n` ions every callback over the last `--track-len`)
+  and `diags/movie/frame_*.npz` (every ion's packed side-view position + energy, `--movie-frames` evenly over
+  the run, ~2.6 GB for R1; 0 = off). Viz turns them into `ion_tracks.png`, `ion_tracks_movie.mp4` and
+  `ions_movie.mp4`. Runs made before these existed fall back to the snapshot movie.
+- Rebuild the images after committing code changes and before any run you keep, so provenance is clean.
 
 ## Rules: containers and HPC
 
@@ -95,7 +102,20 @@ containers/build.sh analysis
 
 # runs (WSL): detached, ranks bound to their own cores; layout per machine from cases/bench_<machine>.yaml
 RANKS=2 THREADS=4 hpc/wsl/run.sh R1_bound_5mT                      # -> runs/<case>_<time>/ (+ .log, .pid)
+RUN_NAME=R2_x FOREGROUND=1 RANKS=2 THREADS=4 hpc/wsl/run.sh R2_best_5mT   # named, blocking (not NAME: WSL sets it)
 fusor-monitor --runs runs                                          # live progress page, http://localhost:8050
 apptainer run sif/analysis.sif runs/<run>                          # -> runs/<run>/post/report.md
+apptainer run sif/viz.sif runs/<run> --movie                       # -> runs/<run>/viz/ (PNGs, both movies)
 LIVE_SRC=1 RANKS=2 THREADS=4 hpc/wsl/run.sh coarse_test            # test ./src changes without a rebuild
+python -m fusorsim.physics.grid3d --case cases/R1_bound_5mT.yaml   # regenerate data/grid_kicks_3d.dat (~15 min)
 ```
+
+## Working from Windows (VS Code) on this machine
+
+- The Windows checkout (`D:\Github\MORF\fusor-sim`, a submodule of MORF) is where code is edited and committed;
+  runs happen in the WSL clone `~/fusor-sim` (ext4, fast). Bring the clone up to date with
+  `git pull --ff-only /mnt/d/Github/MORF/fusor-sim <branch>` (no GitHub credentials needed in WSL).
+- `wsl.exe -- bash -c '...'` mangles `$` (variables, `$?`): put multi-step WSL commands in a script file and run
+  that. Strip CRLF when copying scripts in (`tr -d '\r'`).
+- Long jobs: the PC must stay awake with a terminal attached (WSL stops otherwise), and heavy Windows load
+  (games) halves the speed. Layout here: 2 ranks x 4 threads (`cases/bench_5800X3D.yaml`).
