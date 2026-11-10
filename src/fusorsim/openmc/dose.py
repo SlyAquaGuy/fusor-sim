@@ -41,8 +41,15 @@ W2, W4, W5 = 0.65, 6.75, 3.55   # m to the inside faces of walls 2 (G130), 4 (ro
 LANE = 1.40             # m to the lane side of wall 3: the closest anyone outside can get [Elijah 2026-10-27];
                         # wall 3's inside face (W3, below WALL_LAYERS) is its thickness nearer the chamber
 G130_WIDTH = 2.84       # m, wall 2 to wall 1, scaled off the plan (1.56 cm/px from W2 + W5)   [MEASURE]
-G132_DEPTH = 5.75       # m, wall 5 to the far side of G132, scaled off the plan
-G132_TOP = 1.80         # m, y of G132's wall to G132A, scaled off the plan; wall 5 runs -W3..here
+# The rest of the building, scaled off the Eng 37 plan (Elijah 2026-10-27; 66 px/m both from G131's width
+# W2 + W5 and its depth W3 + W4, so the two agree) [MEASURE]. G131 is L-shaped: north of G132A it runs
+# east to G133. Inner walls are 2 x plasterboard (as wall 2), outer walls brick + plaster (as wall 3).
+G132A_TOP = 3.00        # m, y of G131's inside face of its wall to G132A; wall 5 runs from wall 3 up to here
+G131_EAST = 6.12        # m, x of G131's inside face of its east wall (to G132A and G133), north of G132A
+G132_TOP = 2.00         # m, y of G132's inside face of its wall to G132A / G133
+EAST = 9.20             # m, x of the inside face of the building's east wall (G133, top of G132)
+DIAG_TOP = 0.77         # m, y where G132's slanted south-east wall meets the east wall (inside face) ...
+DIAG_BOTTOM = 6.70      # m, ... and x where it meets wall 3 (inside face)
 ROAD = 6.0              # m, road edge beyond wall 4's outside face        [Elijah]
 WALL1_TOP = 2.10        # m above the floor; wall 1 is open above it        [Elijah]
 DOOR = dict(x=(2.65, 3.55), height=2.10, wood=0.04)   # 4 cm solid wood [Elijah]; 0.9 x 2.1 m at the
@@ -53,12 +60,16 @@ WALL_LAYERS = dict(     # inside -> outside: (material, thickness m, solid fract
     w3=[("plaster", 0.013, 1.0), ("brick", 0.11, 1.0)],                  # 1 sheet + 11 cm brick [Elijah]
     w4=[("plaster", 0.013, 1.0), ("brick", 0.11, 1.0), ("steel", 0.0005, 1.0)],   # + corrugated iron
     w5=[("plaster", 0.15, 0.04 / 0.15)],             # 2 sheets in 15 cm; 2 cm sheets as wall 2  [Elijah]
+    inner=[("plaster", 0.10, 0.04 / 0.10)],          # other partitions: as wall 2          [Elijah 2026-10-27]
+    outer=[("plaster", 0.013, 1.0), ("brick", 0.11, 1.0)],   # other outside walls: as wall 3 [Elijah 2026-10-27]
     ceiling=[("plaster", 0.013, 1.0)],               # roof structure above ignored (conservative)
     ground=[("concrete", 1.0, 1.0)],                 # slab on ground, soil below taken as concrete
 )
 W3 = LANE - sum(t for _, t, _ in WALL_LAYERS["w3"])   # m, inside face of wall 3
-# Walls the plan shows but nobody measured (G132A, G133, the building's end walls) are left out:
-# less attenuation, so conservative for every dose point beyond them.
+# Openings other than the lane door (G132's and G133's doors and windows) are left solid: they are small
+# and mostly face away from the named points. The building west of wall 1 is left out (conservative).
+RIG = (0.0, 0.0)        # m, chamber moved this far east (x) and north (y) of its present spot (--rig).
+                        # The building and the building-fixed dose points stay put; the box moves with it
 LINING = dict(          # --shield lining<t>: poly flat on the walls inside G131, floor to ceiling [Elijah]
     wall3_to=DOOR["x"][0],   # along wall 3 from the wall-2 corner to the door
     wall2_len=2.0,           # m along wall 2 from the wall-3 corner (corner piece counted)
@@ -80,8 +91,11 @@ WORLD = (-15.0, 20.0, -12.0, 25.0, 30.0)   # m, x0 x1 y0 y1 z1 of the air around
 NEUTRON_FOS = 5.0       # factor of safety on the R1 peak neutron rate. The largest uncertainty is the
                         # implanted-D loading f of the wall/cathode targets; x5 on 1.75e7 n/s (8.75e7 n/s)
                         # equals the f = 0.4 saturation row of the R1 report (override with --fos)
-BEAM_HOURS = 960.0      # h of beam a year [Elijah 2026-10-27] (override with --hours-per-year). The yearly
-                        # dose takes the PEAK rate for every hour: no credit for the cathode loading ramp
+BEAM_HOURS = 200.0      # h of HV-on beam a year [Elijah 2026-10-27] (override with --hours-per-year). Was 960
+                        # (4 h/day, 5 days/wk, 48 wk), then 480 (that is lab time, not beam time), then 200:
+                        # the shield needed for 480 h (lid + lead) cost too much. 200 h must go into the RMP
+                        # as an administrative limit (beam-hours log / HV hour meter).
+                        # The yearly dose takes the PEAK rate x FOS for every hour: no credit for the loading ramp
 DOSE_TARGET = 1.0       # mSv/yr design target at the named points outside G131 [Elijah 2026-10-27]
 # =========================================================================
 
@@ -94,12 +108,13 @@ def thick(key):
 
 
 def frame():
-    """Derived planes of the building, m."""
+    """Derived planes of the building, m, in the room frame (origin = the chamber's present spot;
+    subtract RIG for the chamber frame)."""
     zf = -FLOOR
     x2o = -W2 - thick("w2")                 # G130 face of wall 2
     x1 = x2o - G130_WIDTH                   # G130 face of wall 1
     return dict(zf=zf, zc=CEILING - FLOOR, x2o=x2o, x1=x1, xW=x1 - thick("w1"),
-                x5o=W5 + thick("w5"), xE=W5 + thick("w5") + G132_DEPTH,
+                x5o=W5 + thick("w5"), xE=EAST + thick("outer"),
                 y3o=-W3 - thick("w3"), y4o=W4 + thick("w4"), zg=zf - thick("ground"))
 
 
@@ -107,16 +122,21 @@ SIDES = dict(w="G130 (west)", e="G132 (east)", s="lane (south)", n="back (north)
 
 
 def parse_shield(tok, borated=False):
-    """Shield token -> dict(kind, t (m) or sides {w e s n u l: m}, borated). Forms (cm, suffix b = borated):
-    0 | lining10 | box20 (all four sides) | boxw36e10s30n10[u20][l20] (per side) | boxlid... (with a lid)."""
+    """Shield token -> dict(kind, t (m) or sides {w e s n u l: m}, lead {side: m}, borated). Forms (cm,
+    suffix b = borated): 0 | lining10 | box20 (all four sides) | boxw36e10s30n10[u20][l20] (per side) |
+    boxlid... (with a lid); any box form + pb<side><cm> = lead sheet on that side's outer face (pbs3)."""
     s = tok.strip().lower()
     b = s.endswith("b")
     s = s.removesuffix("b")
     num = r"\d+(?:\.\d+)?"
+    lead = {k: float(v) / CM for k, v in re.findall(rf"pb([wesn])({num})", s)}
+    s = re.sub(rf"pb[wesn]{num}", "", s)
     if re.fullmatch(num, s) and float(s) == 0:
         return dict(kind="none", t=0.0, borated=False)
     m = re.fullmatch(rf"(lining|boxlid|box)?({num})", s)
     if m and m.group(1) == "lining":
+        if lead:
+            sys.exit(f"--shield {tok!r}: a lead sheet (pb...) goes on a box, not a lining")
         return dict(kind="lining", t=float(m.group(2)) / CM, borated=b or borated)
     if m:
         sides = dict.fromkeys("wesn", float(m.group(2)) / CM)
@@ -131,7 +151,7 @@ def parse_shield(tok, borated=False):
     sides.setdefault("u", BOX["under"])
     if kind == "boxlid":
         sides.setdefault("l", BOX["lid"])
-    return dict(kind=kind, sides=sides, borated=b or borated)
+    return dict(kind=kind, sides=sides, lead=lead, borated=b or borated)
 
 
 def _cm(v):
@@ -147,7 +167,11 @@ def case_label(sh):
     S = sh["sides"]
     walls = f"{_cm(S['w'])} cm" if len({S[k] for k in 'wesn'}) == 1 else \
         "W/E/S/N " + "/".join(_cm(S[k]) for k in "wesn") + " cm"
-    return f"{mat} box {walls}, under {_cm(S['u'])}" + (f", lid {_cm(S['l'])}" if "l" in S else ", open top")
+    lead = "".join(f", lead {SIDE_WORD[k]} {_cm(v)} cm" for k, v in sh.get("lead", {}).items())
+    return f"{mat} box {walls}, under {_cm(S['u'])}" + (f", lid {_cm(S['l'])}" if "l" in S else ", open top") + lead
+
+
+SIDE_WORD = dict(w="W", e="E", s="S", n="N")
 
 
 def case_dir_name(mode, sh):
@@ -157,28 +181,62 @@ def case_dir_name(mode, sh):
         name = f"lining{_cm(sh['t'])}cm"
     else:
         name = sh["kind"] + "_" + "".join(k + _cm(v) for k, v in sh["sides"].items())
-    return f"{mode}_{name}" + ("_borated" if sh["borated"] else "")
+        name += "".join(f"_pb{k}{_cm(v)}" for k, v in sh.get("lead", {}).items())
+    rig = f"_rig{RIG[0]:+g}{RIG[1]:+g}" if any(RIG) else ""
+    return f"{mode}_{name}" + ("_borated" if sh["borated"] else "") + rig
 
 
 def box_frame(sh):
-    """Inside faces (x0, x1, y0, y1) of the box, m. Centred on the chamber, unless a thick side would
-    reach wall 2 or wall 3: then the box slides away from that wall and the chamber sits off-centre."""
-    S, I = sh["sides"], BOX["inner"] / 2
-    cx = max(0.0, -W2 + BOX["gap"] + I + S["w"])
-    cy = max(0.0, -W3 + BOX["gap"] + I + S["s"])
+    """Inside faces (x0, x1, y0, y1) of the box, m. Centred on the chamber, unless a thick side (with its
+    lead sheet) would reach wall 2 or wall 3: then the box slides away from that wall and the chamber
+    sits off-centre."""
+    S, I, L = sh["sides"], BOX["inner"] / 2, sh.get("lead", {})
+    cx = max(0.0, -W2 - RIG[0] + BOX["gap"] + I + S["w"] + L.get("w", 0.0))
+    cy = max(0.0, -W3 - RIG[1] + BOX["gap"] + I + S["s"] + L.get("s", 0.0))
     return cx - I, cx + I, cy - I, cy + I
 
 
+DENSITY = dict(poly=950.0, lead=11350.0)   # kg/m3 (HDPE; pure lead)
+
+
+def shield_kg(sh):
+    """kg of each shield material in a case, e.g. {'poly': 1890, 'lead': 640}."""
+    kg = {}
+    for s in layout(sh):
+        if s["kind"] == "shield":
+            rho = 1000.0 if s["mat"] == "poly" and sh.get("borated") else DENSITY[s["mat"]]
+            kg[s["mat"]] = kg.get(s["mat"], 0.0) + np.prod([s["box"][2 * i + 1] - s["box"][2 * i]
+                                                            for i in range(3)]) * rho
+    return kg
+
+
 def shield_mass(sh):
-    """kg of poly in a case."""
-    rho = 1000.0 if sh.get("borated") else 950.0
-    return sum(np.prod([s["box"][2 * i + 1] - s["box"][2 * i] for i in range(3)]) * rho
-               for s in layout(sh) if s["kind"] == "shield")
+    """Total kg of shield in a case."""
+    return sum(shield_kg(sh).values())
+
+
+def mass_text(sh):
+    kg = shield_kg(sh)
+    return f"{sum(kg.values()):.0f} kg" + (f" ({kg.get('poly', 0):.0f} poly + {kg['lead']:.0f} lead)"
+                                          if "lead" in kg else "")
+
+
+def _moved(s, dx, dy):
+    """A layout solid shifted by (dx, dy) m in plan."""
+    s = dict(s)
+    sh = lambda b: (b[0] + dx, b[1] + dx, b[2] + dy, b[3] + dy, *b[4:]) if b is not None else None
+    s["box"], s["cut"] = sh(s["box"]), sh(s["cut"])
+    if "planes" in s:                  # n.p between lo and hi: n.(p + d) = n.p + n.d
+        s["planes"] = [(nx, ny, lo + nx * dx + ny * dy, hi + nx * dx + ny * dy) for nx, ny, lo, hi in s["planes"]]
+        s["outline"] = [(x + dx, y + dy) for x, y in s["outline"]]
+    return s
 
 
 def layout(sh):
     """Every solid outside the chamber: dicts of name, material key, solid fraction, box
-    (x0, x1, y0, y1, z0, z1) in m, and an optional box cut out of it. sh from parse_shield."""
+    (x0, x1, y0, y1, z0, z1) in m, and an optional box cut out of it; a slanted wall also has
+    planes [(nx, ny, lo, hi)] (lo < n.p < hi within its box) and a plan outline. sh from parse_shield.
+    The building is laid out in the room frame, then shifted by -RIG into the chamber frame."""
     F = frame()
     zf, zc = F["zf"], F["zc"]
     out = []
@@ -192,24 +250,42 @@ def layout(sh):
                             box=lim["x"] + lim["y"] + lim["z"]))
             p = q
 
+    t_in = thick("inner")
     door_hole = (*DOOR["x"], F["y3o"], -W3, zf, zf + DOOR["height"])
-    stack("w3", "y", -W3, -1, dict(x=(F["xW"], F["xE"]), z=(zf, zc)), cut=door_hole)
+    stack("w3", "y", -W3, -1, dict(x=(F["xW"], DIAG_BOTTOM), z=(zf, zc)), cut=door_hole)
     stack("w4", "y", W4, +1, dict(x=(F["xW"], F["xE"]), z=(zf, zc)))
     stack("w2", "x", -W2, -1, dict(y=(-W3, W4), z=(zf, zc)))
     stack("w1", "x", F["x1"], -1, dict(y=(-W3, W4), z=(zf, zf + WALL1_TOP)))
-    stack("w5", "x", W5, +1, dict(y=(-W3, G132_TOP), z=(zf, zc)))
+    stack("w5", "x", W5, +1, dict(y=(-W3, G132A_TOP), z=(zf, zc)))                 # G131 | G132, G132A
+    stack("inner", "y", G132A_TOP, -1, dict(x=(F["x5o"], G131_EAST), z=(zf, zc)))  # G131 | G132A
+    stack("inner", "x", G131_EAST, +1, dict(y=(G132_TOP + t_in, W4), z=(zf, zc)))   # G131, G132A | G133
+    stack("inner", "y", G132_TOP, +1, dict(x=(F["x5o"], EAST), z=(zf, zc)))         # G132 | G132A, G133
+    stack("outer", "x", EAST, +1, dict(y=(DIAG_TOP, W4), z=(zf, zc)))               # east wall, G133 + G132
+    # G132's slanted south-east wall: layers stacked along its outward normal (towards +x, -y)
+    dx, dy = EAST - DIAG_BOTTOM, DIAG_TOP + W3
+    nx, ny = dy / np.hypot(dx, dy), -dx / np.hypot(dx, dy)
+    c = nx * EAST + ny * DIAG_TOP                                    # n.p on the inside face
+    at = lambda cc, y: ((cc - ny * y) / nx, y)                       # point on n.p = cc at height y
+    for mat, t, frac in WALL_LAYERS["outer"]:
+        corners = [at(c, -W3), at(c, DIAG_TOP), at(c + t, DIAG_TOP), at(c + t, -W3)]
+        xs = [p[0] for p in corners]
+        out.append(dict(name=f"G132 slanted wall {mat}", mat=mat, frac=frac, kind="wall", cut=None,
+                        box=(min(xs), max(xs), -W3, DIAG_TOP, zf, zc), planes=[(nx, ny, c, c + t)],
+                        outline=corners))
+        c += t
     stack("ceiling", "z", zc, +1, dict(x=(F["xW"], F["xE"]), y=(F["y3o"], F["y4o"])))
-    stack("ground", "z", zf, -1, dict(x=WORLD[0:2], y=WORLD[2:4]))
     out.append(dict(name="door (wood)", mat="wood", frac=1.0, kind="door", cut=None,
                     box=(*DOOR["x"], F["y3o"], F["y3o"] + DOOR["wood"], zf, zf + DOOR["height"])))
-    def poly(name, b):
-        out.append(dict(name=name, mat="poly", frac=1.0, kind="shield", cut=None, box=b))
+    def poly(name, b, mat="poly"):
+        out.append(dict(name=name, mat=mat, frac=1.0, kind="shield", cut=None, box=b))
 
     if sh["kind"] == "lining":
         t = sh["t"]
         poly("poly lining, wall 3", (-W2, LINING["wall3_to"], -W3, -W3 + t, zf, zc))
         poly("poly lining, wall 2", (-W2, -W2 + t, -W3 + t, -W3 + LINING["wall2_len"], zf, zc))
-    elif sh["kind"] in ("box", "boxlid"):
+    out[:] = [_moved(s, -RIG[0], -RIG[1]) for s in out]               # into the chamber frame
+    stack("ground", "z", zf, -1, dict(x=WORLD[0:2], y=WORLD[2:4]))   # whole world: not shifted
+    if sh["kind"] in ("box", "boxlid"):
         S = sh["sides"]
         x0, x1, y0, y1 = box_frame(sh)
         X0, X1, Y0, Y1 = x0 - S["w"], x1 + S["e"], y0 - S["s"], y1 + S["n"]
@@ -222,32 +298,52 @@ def layout(sh):
             poly("poly box, under the table top", (X0, X1, Y0, Y1, zt - S["u"], zt))
         if S.get("l", 0) > 0:
             poly("poly box, lid", (X0, X1, Y0, Y1, zb, zb + S["l"]))
+        # lead sheet on a side's outer face, from the bottom of the under slab to the top of the lid:
+        # it stops the 2.2 MeV H-capture gammas the poly itself makes, which HDPE barely attenuates.
+        # x faces span the box depth; y faces also run across the x sheets' ends, so corners are closed
+        L = sh.get("lead", {})
+        lw, le = L.get("w", 0.0), L.get("e", 0.0)
+        zlo, zhi = zt - S["u"], zb + S.get("l", 0.0)
+        for k, b in (("w", (X0 - lw, X0, Y0, Y1)), ("e", (X1, X1 + le, Y0, Y1)),
+                     ("s", (X0 - lw, X1 + le, Y0 - L.get("s", 0.0), Y0)),
+                     ("n", (X0 - lw, X1 + le, Y1, Y1 + L.get("n", 0.0)))):
+            if L.get(k, 0.0) > 0:
+                poly(f"lead sheet, {SIDES[k]} side", (*b, zlo, zhi), mat="lead")
     return out
 
 
 def points():
-    """Named dose points: name -> ((x, y, z) m, scoring box size m: a cube side or (dx, dy, dz))."""
+    """Named dose points: name -> ((x, y, z) m in the chamber frame, scoring box size m: a cube side or
+    (dx, dy, dz)). Room middles and the door are fixed to the building; the lane, road and dirt-strip
+    points (and 'behind wall 2') sit opposite the chamber wherever it is, so they catch the closest approach."""
     F = frame()
+    rx, ry = RIG
     lane = (0.4, 0.1, 0.4)              # a thin box flat on the lane side of wall 3: dose at the closest approach
-    y_lane = F["y3o"] - lane[1] / 2
+    y_lane = F["y3o"] - lane[1] / 2 - ry
+    t_in = thick("inner")
     P = {"G131, 1 m from chamber": ((1.0, 0.0, 0.0), 0.4),
-         "G130, 0.3 m behind wall 2": ((F["x2o"] - 0.3, 0.0, 0.0), 0.4),
-         "G130, middle": (((F["x2o"] + F["x1"]) / 2, (W4 - W3) / 2, 0.0), 0.4),
-         "G132, middle": (((F["x5o"] + F["xE"]) / 2, (G132_TOP - W3) / 2, 0.0), 0.4)}
+         "G130, 0.3 m behind wall 2": ((F["x2o"] - 0.3 - rx, 0.0, 0.0), 0.4),
+         # beyond G130 (stairs / corridor on the plan; not modelled, open air: conservative). The design point
+         # west of G131 when G130 is a card-access room closed during beam time [Elijah 2026-10-27]
+         "West of wall 1, opposite the chamber": ((F["xW"] - 0.3 - rx, 0.0, 0.0), 0.4),
+         "G130, middle": (((F["x2o"] + F["x1"]) / 2 - rx, (W4 - W3) / 2 - ry, 0.0), 0.4),
+         "G132, middle": (((F["x5o"] + EAST) / 2 - rx, (G132_TOP - W3) / 2 - ry, 0.0), 0.4),
+         # not a point Elijah named (nobody asked for it), shown for information
+         "G133, middle": (((G131_EAST + t_in + EAST) / 2 - rx, (G132_TOP + t_in + W4) / 2 - ry, 0.0), 0.4)}
     for x in (-0.5, 0.0, 1.0, 2.0):
         P[f"Lane, against wall 3, x {x:+.1f} m"] = ((x, y_lane, 0.0), lane)
-    P["Lane, against the door"] = ((sum(DOOR["x"]) / 2, y_lane, 0.0), lane)
-    P[f"Road, {ROAD:g} m past wall 4"] = ((0.0, F["y4o"] + ROAD, 0.0), 1.0)   # bigger cube: far, flat field
+    P["Lane, against the door"] = ((sum(DOOR["x"]) / 2 - rx, y_lane, 0.0), lane)
+    P[f"Road, {ROAD:g} m past wall 4"] = ((0.0, F["y4o"] + ROAD - ry, 0.0), 1.0)   # bigger cube: far, flat field
     # bare dirt between wall 4 and the road: nothing there, but people can stand on it [Elijah 2026-10-27];
     # scored as fully occupied (no occupancy factor), against the wall opposite the chamber
-    P["Dirt strip, against wall 4"] = ((0.0, F["y4o"] + lane[1] / 2, 0.0), lane)
+    P["Dirt strip, against wall 4"] = ((0.0, F["y4o"] + lane[1] / 2 - ry, 0.0), lane)
     return P
 
 
 # --------------------------------------------------------------- materials
 COLORS = dict(steel=(120, 120, 130), glass=(120, 200, 255), poly=(250, 230, 150), air=(255, 255, 255),
               concrete=(150, 150, 150), block=(170, 160, 150), brick=(170, 80, 60), plaster=(215, 215, 190),
-              wood=(160, 110, 60), cathode=(255, 150, 0), anode=(0, 120, 0))
+              wood=(160, 110, 60), lead=(70, 70, 90), cathode=(255, 150, 0), anode=(0, 120, 0))
 
 
 def materials(openmc, borated):
@@ -296,6 +392,9 @@ def materials(openmc, borated):
     wood = openmc.Material(name="wood (cellulose, light)")    # low end for solid timber: conservative
     wood.add_elements_from_formula("C6H10O5")
     wood.set_density("g/cm3", 0.60); M["wood"] = wood
+    lead = openmc.Material(name="lead")
+    lead.add_element("Pb", 1.0)
+    lead.set_density("g/cm3", DENSITY["lead"] / 1000); M["lead"] = lead
     return M
 
 
@@ -391,6 +490,9 @@ def build_geometry(openmc, D, run_params, sh):
         reg = box(s["box"])
         if s["cut"] is not None:      # e.g. the doorway: what the door leaf doesn't fill stays air
             reg = reg & ~box(s["cut"])
+        for nx, ny, lo, hi in s.get("planes", []):   # a slanted wall: the slab between two planes
+            reg = (reg & +openmc.Plane(a=nx, b=ny, c=0.0, d=lo * CM)
+                   & -openmc.Plane(a=nx, b=ny, c=0.0, d=hi * CM))
         solids.append(reg)
         cells.append(openmc.Cell(name=s["name"], fill=fill, region=reg))
     cells.append(openmc.Cell(name="air", fill=M["air"], region=world & ~outer & ~openmc.Union(solids)))
@@ -405,7 +507,8 @@ def build_geometry(openmc, D, run_params, sh):
 VOXEL = 0.20      # m, 3-D dose map
 PIXEL = 0.05      # m, slice maps
 SLAB = 0.40       # m, thickness each slice map averages over (centred on the chamber)
-MAP = dict(x=(-5.0, 11.0), y=(-3.5, 14.0), z=(-FLOOR - 1.0, 4.0))   # m, extent of all maps
+MAP = dict(x=(-9.0, 13.0), y=(-9.0, 14.0), z=(-FLOOR - 1.0, 4.0))   # m, extent of all maps: wide enough that
+                  # the 0.3 mSv/yr contour closes inside the plan (shield options judged on where it falls)
 SLICES = {"plan": ("xy", "z"), "side_xz": ("xz", "y"), "side_yz": ("yz", "x")}   # shown axes, fixed axis
 
 
@@ -532,7 +635,7 @@ def post(case_dir, D, mode, S, sec_per_shot, sh, fos=1.0):
                         **{f"extent_{a}_m": np.array(MAP[a]) for a in "xyz"}, **maps)
 
     lines = [f"# Fusor dose rates -- {mode}, {case_label(sh)}\n",
-             f"Shield mass {shield_mass(sh):.0f} kg. Source:{S:.3e} {'n' if mode == 'neutron' else 'e'}/s "
+             f"Shield mass {mass_text(sh)}. Source:{S:.3e} {'n' if mode == 'neutron' else 'e'}/s "
              f"({f'peak x FOS {fos:g}' if mode == 'neutron' else 'TTB electrons'}); "
              f"{nps:.2e} histories; H*(10) with ICRP 74 coefficients. Per shot = {sec_per_shot:.1f} s at this rate; "
              f"mSv/yr = {BEAM_HOURS:g} h of beam a year, all at the peak rate.\n",
@@ -582,6 +685,10 @@ def draw_slice(ax, plt, data, name, sh, year, rows=None):
         if not b[2 * k] <= 0.0 <= b[2 * k + 1] or s["name"].startswith("ground"):
             continue
         ec = {"shield": "#7CFC00", "door": "#FFD700"}.get(s["kind"], "cyan")
+        if "outline" in s:             # slanted wall: its plan outline; in a side cut it is not a box
+            if shown == "xy":
+                ax.add_patch(plt.Polygon(s["outline"], closed=True, fill=False, ec=ec, lw=0.8))
+            continue
         ax.add_patch(plt.Rectangle((b[2 * i], b[2 * j]), b[2 * i + 1] - b[2 * i], b[2 * j + 1] - b[2 * j],
                                    fill=False, ec=ec, lw=0.8))
     if "z" in shown:
@@ -656,7 +763,7 @@ def provenance():
 
 # --------------------------------------------------------------------- main
 def main():
-    global BEAM_HOURS
+    global BEAM_HOURS, RIG, MAP
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("post", help="run_X/post folder (has source_terms.json and openmc_sources.py)")
     ap.add_argument("--mode", choices=["neutron", "xray", "xray-bound", "xray-kramers"], default="neutron",
@@ -665,6 +772,7 @@ def main():
     ap.add_argument("--shield", nargs="+", default=["box20"],
                     help="shield case(s): 0 = none; box<cm> = poly box on the table, open top (BOX); boxlid<cm> = "
                          "the same with a lid; lining<cm> = wall 3 to the door + 2 m of wall 2 (LINING); "
+                         "pb<side><cm> = lead sheet on a box side, cm (boxlid20pbs3); "
                          "suffix b = 5 wt%% borated (e.g. 0 box20 box20b boxlid20)")
     ap.add_argument("--borated", action="store_true", help="every shield is 5 wt%% borated poly")
     ap.add_argument("--particles", type=float, default=1e6, help="particles per batch")
@@ -676,11 +784,18 @@ def main():
     ap.add_argument("--out", default=None, help="output folder (default: <run>/openmc)")
     ap.add_argument("--hours-per-year", type=float, default=BEAM_HOURS,
                     help="beam-on time per year for the yearly dose, h (default %(default)s)")
+    ap.add_argument("--rig", default="0,0",
+                    help="move the chamber X,Y m east,north of its present spot in G131, m (e.g. 2.5,3); "
+                         "the building and room dose points stay put (default %(default)s)")
     ap.add_argument("--fos", type=float, default=NEUTRON_FOS,
                     help="factor of safety on the neutron source strength, dimensionless; neutron mode only "
                          "(default %(default)s)")
     a = ap.parse_args()
     BEAM_HOURS = a.hours_per_year
+    RIG = tuple(float(v) for v in a.rig.split(","))
+    # maps follow the building, not the chamber (whole metres keep the voxel grid on whole metres)
+    MAP = dict(x=(MAP["x"][0] - round(RIG[0]), MAP["x"][1] - round(RIG[0])),
+               y=(MAP["y"][0] - round(RIG[1]), MAP["y"][1] - round(RIG[1])), z=MAP["z"])
     cases = [parse_shield(tok, a.borated) for tok in a.shield]
 
     post_dir = os.path.abspath(a.post)
@@ -726,12 +841,14 @@ def main():
             model = openmc.Model(geometry=geom, materials=mats, settings=st, tallies=build_tallies(openmc),
                                  plots=build_plots(openmc, colors))
             model.export_to_xml(directory=case)
-            json.dump(dict(mode=a.mode, fos=fos, source_per_s=S, shield=sh, box=BOX, shield_kg=shield_mass(sh),
+            json.dump(dict(mode=a.mode, fos=fos, source_per_s=S, shield=sh, box=BOX, shield_kg=shield_kg(sh),
                            box_inside_faces_m=box_frame(sh) if "sides" in sh else None,
                            particles=st.particles, batches=st.batches, floor_m=FLOOR, ceiling_m=CEILING,
                            table_top_m=TABLE_TOP, chamber_stand_m=CHAMBER_STAND, chamber_tall_m=CHAMBER_TALL,
-                           walls_m=dict(W2=W2, W3=W3, W4=W4, W5=W5), g130_width_m=G130_WIDTH,
-                           g132=dict(depth_m=G132_DEPTH, top_m=G132_TOP), road_m=ROAD, wall1_top_m=WALL1_TOP,
+                           walls_m=dict(W2=W2, W3=W3, W4=W4, W5=W5), g130_width_m=G130_WIDTH, rig_m=RIG,
+                           rooms_m=dict(G132A_TOP=G132A_TOP, G131_EAST=G131_EAST, G132_TOP=G132_TOP, EAST=EAST,
+                                        DIAG_TOP=DIAG_TOP, DIAG_BOTTOM=DIAG_BOTTOM),
+                           road_m=ROAD, wall1_top_m=WALL1_TOP,
                            door=DOOR, wall_layers=WALL_LAYERS, lining=LINING, world_m=WORLD,
                            chamber_wall_m=CHAMBER_WALL, viewport=VIEWPORT, points=points(),
                            hours_per_year=BEAM_HOURS, dose_target_mSv=DOSE_TARGET, openmc=openmc.__version__,
@@ -753,7 +870,7 @@ def main():
                  f"Peak dose rate µSv/h (mSv/yr at {BEAM_HOURS:g} h of beam a year)\n",
                  "| # | Location | " + " | ".join(case_label(sh) for sh, _, _ in results) + " |",
                  "|---|---|" + "---|" * len(results),
-                 "| | Shield mass | " + " | ".join(f"{shield_mass(sh):.0f} kg" for sh, _, _ in results) + " |"]
+                 "| | Shield mass | " + " | ".join(mass_text(sh) for sh, _, _ in results) + " |"]
         for i, nm in enumerate(names):
             lines.append(f"| {i + 1} | {nm} | " + " | ".join(
                 f"{rows[i]['total_uSv_h']:.3g} ±{100 * rows[i]['rel_err']:.0f}% ({rows[i]['mSv_per_year']:.2g})"
